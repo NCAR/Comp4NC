@@ -1,12 +1,17 @@
-name: sandbox-devel
+name: pyCompress4NC
 channels:
   - conda-forge
 dependencies:
   - codecov
+  - dask
+  - nbsphinx
   - netcdf4
+  - numpydoc
   - pip
   - pytest
   - pytest-cov
+  - python=3.7
+  - scipy
   - xarray
-  - numpydoc
-  - nbsphinx
+  - zarr
+  - zfpy

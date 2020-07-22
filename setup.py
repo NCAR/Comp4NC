@@ -11,7 +11,7 @@ with open('README.rst') as f:
     long_description = f.read()
 
 setup(
-    maintainer="Haiying Xu",
+    maintainer='Haiying Xu',
     maintainer_email='haiyingx@ucar.edu',
     python_requires='>=3.6',
     classifiers=[
@@ -35,10 +35,10 @@ setup(
     name='pyCompress4NC',
     packages=find_packages(include=['pyCompress4NC', 'pyCompress4NC.*']),
     url='https://github.com/NCAR/pyCompress4NC',
-      project_urls={
+    project_urls={
         'Documentation': 'https://github.com/NCAR/pyCompress4NC',
         'Source': 'https://github.com/NCAR/pyCompress4NC',
-        'Tracker': 'https://github.com/NCAR/pyCompress4NC/issues'
+        'Tracker': 'https://github.com/NCAR/pyCompress4NC/issues',
     },
     zip_safe=False,
 )

@@ -94,14 +94,3 @@ class Runner:
         self.client.cluster.close()
         self.client.close()
         return ds
-
-
-@click.command()
-@click.argument('config_file', type=click.Path(exists=True))
-def cli(config_file):
-    runner = Runner(config_file)
-    runner.run()
-
-
-if __name__ == '__main__':
-    cli()

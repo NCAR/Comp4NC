@@ -34,7 +34,7 @@ For a development install, do the following in the repository directory:
 .. code-block:: bash
 
     conda env update -f ci/environment.yml
-    conda activate sandbox-devel
+    conda activate pyCompress4NC
     python -m pip install -e .
 
 Also, please install `pre-commit` hooks from the root directory of the created project by running::
@@ -43,6 +43,10 @@ Also, please install `pre-commit` hooks from the root directory of the created p
       pre-commit install
 
 These code style pre-commit hooks (black, isort, flake8, ...) will run every time you are about to commit code.
+
+To run the codes::
+
+      python pyCompress4NC/core.py cheyenne,yaml
 
 Re-create notebooks with Pangeo Binder
 --------------------------------------

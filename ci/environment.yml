@@ -15,3 +15,5 @@ dependencies:
   - xarray
   - zarr
   - zfpy
+  - pip:
+       - git+https://github.com/halehawk/numcodecs.git@zfpy

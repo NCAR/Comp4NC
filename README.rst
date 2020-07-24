@@ -46,7 +46,7 @@ These code style pre-commit hooks (black, isort, flake8, ...) will run every tim
 
 To run the codes::
 
-      python pyCompress4NC/core.py cheyenne.yaml
+      ./pyCompress pyCompress4NC/cheyenne.yaml
 
 Re-create notebooks with Pangeo Binder
 --------------------------------------

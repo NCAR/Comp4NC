@@ -1,8 +1,0 @@
-queue: regular
-walltime: 1:00:00
-memory: 109GB
-maxcore_per_node: 36
-number_of_workers_per_nodes: 10
-number_of_nodes: 1
-input_dir: /glade/scratch/haiyingx/x1.2621442.output.2010-10-23_00.00.00.vorticity.nc
-output_dir: /glade/scratch/haiyingx/pyCompress4NC_output

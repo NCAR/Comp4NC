@@ -1,20 +1,24 @@
+import glob
 import logging
 import os
+import shutil
+from os.path import abspath, basename, dirname, join
 from time import sleep, time
 
 import click
 import dask.array as da
 import numpy as np
 import xarray as xr
+import zarr
 from dask_jobqueue import PBSCluster, SLURMCluster
 from distributed import Client
-from numcodecs import Blosc
+from numcodecs.zfpy import ZFPY, _zfpy
 
 logger = logging.getLogger()
 logger.setLevel(level=logging.WARNING)
 
-here = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
-results_dir = os.path.join(here, 'results')
+here = dirname(abspath(dirname(__file__)))
+results_dir = join(here, 'results')
 
 
 def cluster_wait(client, n_workers):
@@ -31,6 +35,55 @@ def cluster_wait(client, n_workers):
         # just break out
         if elapsed > wait_thresh and len(client.cluster.scheduler.workers) >= worker_thresh:
             break
+
+
+def convert_zarr(ds, varname, tol, path_zarr):
+
+    compressor = ZFPY(mode=_zfpy.mode_fixed_accuracy, tolerance=tol)
+    # zarr.storage.default_compressor = compressor
+
+    ds1 = ds.chunk(chunks={'time': 100})
+    ds1[varname].encoding['compressor'] = compressor
+
+    ds1.to_zarr(path_zarr, mode='w', consolidated=True)
+
+
+def write_to_netcdf(path_zarr, path_nc):
+
+    ds = xr.open_zarr(path_zarr)
+    comp = dict(zlib=True, complevel=5)
+    encoding = {var: comp for var in ds.data_vars}
+
+    ds.to_netcdf(path_nc, encoding=encoding)
+
+
+def output_path(tol, cmp0, frequency, var, filename_first, write=False):
+
+    dirout = ' '
+    path_zarr = f'{dirout}/cmp0/{tol}/{frequency}/{filename_first}.zarr'
+    path_nc = f'{dirout}/cmp0/{tol}/{frequency}/{filename_first}.nc'
+    if write and os.path.exists(path_zarr):
+        shutil.rmtree(path_zarr)
+    print(path_zarr)
+    return path_zarr, path_nc
+
+
+def parse_filename(filename):
+
+    import re
+
+    'filename = /glade/p/cisl/asap/abaker/pepsi/ens_31/orig/monthly/*.nc'
+    test_str = '/'
+    res = [i.start() for i in re.finditer(filename, test_str)]
+    cmp0 = res[5] + '/' + res[6]
+    frequency = res[8]
+    filename_only = res[-1]
+    test_str = '.'
+    res = [i.start() for i in re.finditer(filename_only, test_str)]
+    filename_first = basename(filename)
+    varname = res[7]
+    print(varname)
+    return varname, cmp0, frequency, filename_first
 
 
 class Runner:
@@ -85,9 +138,18 @@ class Runner:
         logger.warning('wait')
         # cluster_wait(self.client, num_nodes * num_workers)
 
-        ds = xr.open_dataset(
-            input_file, chunks={'nVertLevels': 1, 'nCells': 2621442, 'nVertLevelsP1': 1}
-        )
+        files = glob.glot('/glade/p/cisl/asap/abaker/pepsi/ens_31/orig/monthly/*.nc')
+        tol = 1e-2
+        # dirout = '/glade/scratch/haiyingx'
+        for i in files:
+            varname, cmp0, frequency, filename_first = parse_filename(i)
+            ds = xr.open_dataset(i)
+            path_zarr, path_nc = output_path(tol, cmp0, frequency, varname, filename_first)
+            convert_zarr(ds, varname, tol, path_zarr)
+            write_to_netcdf(path_zarr, path_nc)
+        # ds = xr.open_dataset(
+        #    input_file, chunks={'nVertLevels': 1, 'nCells': 2621442, 'nVertLevelsP1': 1}
+        # )
 
         logger.warning(ds)
         logger.warning('done')

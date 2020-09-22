@@ -57,11 +57,10 @@ def write_to_netcdf(path_zarr, path_nc):
     ds.to_netcdf(path_nc, encoding=encoding)
 
 
-def output_path(tol, cmp0, frequency, var, filename_first, write=False):
+def output_path(tol, cmpn, frequency, var, filename_first, dirout, write=False):
 
-    dirout = ' '
-    path_zarr = f'{dirout}/cmp0/{tol}/{frequency}/{filename_first}.zarr'
-    path_nc = f'{dirout}/cmp0/{tol}/{frequency}/{filename_first}.nc'
+    path_zarr = f'{dirout}/{cmpn}/{tol}/{frequency}/{filename_first}.zarr'
+    path_nc = f'{dirout}/{cmpn}/{tol}/{frequency}/{filename_first}.nc'
     if write and os.path.exists(path_zarr):
         shutil.rmtree(path_zarr)
     print(path_zarr)
@@ -72,18 +71,15 @@ def parse_filename(filename):
 
     import re
 
-    'filename = /glade/p/cisl/asap/abaker/pepsi/ens_31/orig/monthly/*.nc'
-    test_str = '/'
-    res = [i.start() for i in re.finditer(filename, test_str)]
-    cmp0 = res[5] + '/' + res[6]
-    frequency = res[8]
+    res = re.split(r'\/', filename)
+    cmpn = res[6] + '/' + res[7]
+    frequency = res[9]
     filename_only = res[-1]
-    test_str = '.'
-    res = [i.start() for i in re.finditer(filename_only, test_str)]
+    res = re.split(r'\.', filename_only)
     filename_first = basename(filename)
     varname = res[7]
     print(varname)
-    return varname, cmp0, frequency, filename_first
+    return varname, cmpn, frequency, filename_first
 
 
 class Runner:
@@ -138,13 +134,15 @@ class Runner:
         logger.warning('wait')
         # cluster_wait(self.client, num_nodes * num_workers)
 
-        files = glob.glot('/glade/p/cisl/asap/abaker/pepsi/ens_31/orig/monthly/*.nc')
+        files = glob.glob('/glade/p/cisl/asap/abaker/pepsi/ens_31/orig/monthly/*.nc')
         tol = 1e-2
-        # dirout = '/glade/scratch/haiyingx'
+        dirout = '/glade/scratch/haiyingx'
         for i in files:
-            varname, cmp0, frequency, filename_first = parse_filename(i)
+            varname, cmpn, frequency, filename_first = parse_filename(i)
+            if varname == 'FICE':
+                continue
             ds = xr.open_dataset(i)
-            path_zarr, path_nc = output_path(tol, cmp0, frequency, varname, filename_first)
+            path_zarr, path_nc = output_path(tol, cmpn, frequency, varname, filename_first, dirout)
             convert_zarr(ds, varname, tol, path_zarr)
             write_to_netcdf(path_zarr, path_nc)
         # ds = xr.open_dataset(

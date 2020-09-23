@@ -24,8 +24,7 @@ results_dir = join(here, 'results')
 
 
 def cluster_wait(client, n_workers):
-    """ Delay process until all workers in the cluster are available.
-    """
+    """ Delay process until all workers in the cluster are available. """
     start = time()
     wait_thresh = 600
     worker_thresh = n_workers * 0.95

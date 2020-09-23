@@ -1,9 +1,9 @@
 import glob
 import logging
+import re
 import shutil
-from os import stat
+from math import ceil
 from os.path import abspath, basename, dirname, exists, getsize, join
-from pathlib import Path
 from time import sleep, time
 
 import click
@@ -11,7 +11,6 @@ import dask.array as da
 import numpy as np
 import xarray as xr
 import zarr
-import zarr.storage
 from dask_jobqueue import PBSCluster, SLURMCluster
 from distributed import Client
 from numcodecs.zfpy import ZFPY, _zfpy
@@ -52,7 +51,13 @@ def convert_zarr(ds, varname, path_zarr, comp):
     compressor = ZFPY(mode=m, tolerance=comp['comp_level'])
     # zarr.storage.default_compressor = compressor
 
-    ds1 = ds.chunk(chunks={'time': 100})
+    """ Check if variable data nbytes are less than 192MB """
+    if ds[varname].nbytes < 201326592:
+        timestep = -1
+    else:
+        x = ceil(ds[varname].nbytes / 201326592)
+        timestep = ds[varname].sizes['time'] / x
+    ds1 = ds.chunk(chunks={'time': timestep})
     ds1[varname].encoding['compressor'] = compressor
 
     ds1.to_zarr(path_zarr, mode='w', consolidated=True)
@@ -78,8 +83,6 @@ def output_path(cmpn, frequency, var, filename_first, dirout, comp, write=False)
 
 def parse_filename(filename):
 
-    import re
-
     res = re.split(r'\/', filename)
     cmpn = res[6] + '/' + res[7]
     frequency = res[9]
@@ -88,6 +91,25 @@ def parse_filename(filename):
     filename_first = basename(filename)
     varname = res[7]
     return varname, cmpn, frequency, filename_first
+
+
+def get_filesize(file_dict):
+
+    for k, v in file_dict.items():
+        if k == 'zarr':
+            """ Parse zarr info to get compressed file size """
+            filename = zarr.open(v, mode='r')
+            info = str(filename[file_dict['var']].info)
+            temp = re.split(r'\.', info)[-3]
+            filesize = re.split(r' ', temp)[-2]
+            temp = re.split(r'\.', info)[-5]
+            origsize = re.split(r' ', temp)[-2]
+
+            print(f'{file_dict["var"]} orig {origsize}')
+            print(f'{file_dict["var"]} {k} {filesize}')
+        elif k == 'nc':
+            filesize = getsize(v)
+            print(f'{file_dict["var"]} {k} {filesize}')
 
 
 class Runner:
@@ -145,12 +167,10 @@ class Runner:
 
         files = glob.glob(input_dir)
         pre = {}
+        start = 28
         for counter, i in enumerate(files):
-            if counter > 29:
-                print(f'{pre["var"]} nc {getsize(pre["nc"])}')
-                store = Path('/').glob(pre['zarr'])
-                print(store)
-                print(f'{pre["var"]} zarr {zarr.storage.getsize(store)}')
+            if counter > start + 1:
+                get_filesize(pre)
             if counter > 28:
                 varname, cmpn, frequency, filename_first = parse_filename(i)
                 if varname in ['FICE', 'TOT_CLD_VISTAU', 'Z3', 'VQ', 'OMEGA', 'U']:

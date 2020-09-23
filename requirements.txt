@@ -8,3 +8,4 @@ pre-commit
 xarray
 zarr
 zfpy
+git+https://github.com/halehawk/numcodecs.git@zfpy#egg=package-name

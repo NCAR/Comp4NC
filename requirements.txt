@@ -1,11 +1,2 @@
-click
-dask
-dask[array]
-dask_jobqueue
 netcdf4
-numpy
-pre-commit
 xarray
-zarr
-zfpy
--e git+https://github.com/halehawk/numcodecs.git@zfpy#egg=numcodecs

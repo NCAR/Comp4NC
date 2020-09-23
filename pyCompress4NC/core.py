@@ -1,8 +1,9 @@
 import glob
 import logging
-import os
 import shutil
-from os.path import abspath, basename, dirname, join
+from os import stat
+from os.path import abspath, basename, dirname, exists, getsize, join
+from pathlib import Path
 from time import sleep, time
 
 import click
@@ -10,6 +11,7 @@ import dask.array as da
 import numpy as np
 import xarray as xr
 import zarr
+import zarr.storage
 from dask_jobqueue import PBSCluster, SLURMCluster
 from distributed import Client
 from numcodecs.zfpy import ZFPY, _zfpy
@@ -37,9 +39,18 @@ def cluster_wait(client, n_workers):
             break
 
 
-def convert_zarr(ds, varname, tol, path_zarr):
+def convert_zarr(ds, varname, path_zarr, comp):
 
-    compressor = ZFPY(mode=_zfpy.mode_fixed_accuracy, tolerance=tol)
+    if comp['comp_mode'] == 'a':
+        m = _zfpy.mode_fixed_accuracy
+    elif comp['comp_mode'] == 'p':
+        m = _zfpy.mode_fixed_precision
+    elif comp['comp_mode'] == 'r':
+        m = _zfpy.mode_fixed_rate
+    else:
+        print('Wrong zfp compression mode')
+
+    compressor = ZFPY(mode=m, tolerance=comp['comp_level'])
     # zarr.storage.default_compressor = compressor
 
     ds1 = ds.chunk(chunks={'time': 100})
@@ -57,13 +68,12 @@ def write_to_netcdf(path_zarr, path_nc):
     ds.to_netcdf(path_nc, encoding=encoding)
 
 
-def output_path(tol, cmpn, frequency, var, filename_first, dirout, write=False):
-
-    path_zarr = f'{dirout}/{cmpn}/{tol}/{frequency}/{filename_first}.zarr'
-    path_nc = f'{dirout}/{cmpn}/{tol}/{frequency}/{filename_first}.nc'
-    if write and os.path.exists(path_zarr):
+def output_path(cmpn, frequency, var, filename_first, dirout, comp, write=False):
+    comp_name = f'{comp["comp_method"]}_{comp["comp_mode"]}_{comp["comp_level"]}'
+    path_zarr = f'{dirout}/{cmpn}/{comp_name}/{frequency}/{filename_first}.zarr'
+    path_nc = f'{dirout}/{cmpn}/{comp_name}/{frequency}/{filename_first}.nc'
+    if write and exists(path_zarr):
         shutil.rmtree(path_zarr)
-    print(path_zarr)
     return path_zarr, path_nc
 
 
@@ -78,7 +88,6 @@ def parse_filename(filename):
     res = re.split(r'\.', filename_only)
     filename_first = basename(filename)
     varname = res[7]
-    print(varname)
     return varname, cmpn, frequency, filename_first
 
 
@@ -117,13 +126,14 @@ class Runner:
         maxcore_per_node = self.params['maxcore_per_node']
         num_workers = self.params['number_of_workers_per_nodes']
         num_nodes = self.params['number_of_nodes']
-        input_file = self.params['input_dir']
+        input_dir = self.params['input_dir']
         output_dir = self.params['output_dir']
+        compression = self.params['compression']
         logger.warning(memory)
         logger.warning(maxcore_per_node)
         logger.warning(num_nodes)
         logger.warning(num_workers)
-        logger.warning(input_file)
+        logger.warning(input_dir)
         logger.warning(output_dir)
         logger.warning(walltime)
         self.create_cluster(queue, maxcore_per_node, memory, num_workers, walltime)
@@ -134,17 +144,27 @@ class Runner:
         logger.warning('wait')
         # cluster_wait(self.client, num_nodes * num_workers)
 
-        files = glob.glob('/glade/p/cisl/asap/abaker/pepsi/ens_31/orig/monthly/*.nc')
-        tol = 1e-2
-        dirout = '/glade/scratch/haiyingx'
-        for i in files:
-            varname, cmpn, frequency, filename_first = parse_filename(i)
-            if varname == 'FICE':
-                continue
-            ds = xr.open_dataset(i)
-            path_zarr, path_nc = output_path(tol, cmpn, frequency, varname, filename_first, dirout)
-            convert_zarr(ds, varname, tol, path_zarr)
-            write_to_netcdf(path_zarr, path_nc)
+        files = glob.glob(input_dir)
+        pre = {}
+        for counter, i in enumerate(files):
+            if counter > 29:
+                print(f'{pre["var"]} nc {getsize(pre["nc"])}')
+                store = Path('/').glob(pre['zarr'])
+                print(store)
+                print(f'{pre["var"]} zarr {zarr.storage.getsize(store)}')
+            if counter > 28:
+                varname, cmpn, frequency, filename_first = parse_filename(i)
+                if varname in ['FICE', 'TOT_CLD_VISTAU', 'Z3', 'VQ', 'OMEGA', 'U']:
+                    continue
+                with xr.open_dataset(i) as ds:
+                    path_zarr, path_nc = output_path(
+                        cmpn, frequency, varname, filename_first, output_dir, compression
+                    )
+                    pre['var'] = varname
+                    pre['zarr'] = path_zarr
+                    pre['nc'] = path_nc
+                    convert_zarr(ds, varname, path_zarr, compression)
+                    write_to_netcdf(path_zarr, path_nc)
         # ds = xr.open_dataset(
         #    input_file, chunks={'nVertLevels': 1, 'nCells': 2621442, 'nVertLevelsP1': 1}
         # )

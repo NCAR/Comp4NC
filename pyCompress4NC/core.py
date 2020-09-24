@@ -56,7 +56,8 @@ def convert_zarr(ds, varname, path_zarr, comp):
         timestep = -1
     else:
         x = ceil(ds[varname].nbytes / 201326592)
-        timestep = ds[varname].sizes['time'] / x
+        timestep = int(ds[varname].sizes['time'] / x)
+    print(timestep)
     ds1 = ds.chunk(chunks={'time': timestep})
     ds1[varname].encoding['compressor'] = compressor
 
@@ -171,7 +172,7 @@ class Runner:
         for counter, i in enumerate(files):
             if counter > start + 1:
                 get_filesize(pre)
-            if counter > 28:
+            if counter > 88:
                 varname, cmpn, frequency, filename_first = parse_filename(i)
                 if varname in ['FICE', 'TOT_CLD_VISTAU', 'Z3', 'VQ', 'OMEGA', 'U']:
                     continue

@@ -73,6 +73,15 @@ def write_to_netcdf(path_zarr, path_nc):
     ds.to_netcdf(path_nc, encoding=encoding)
 
 
+def output_singlefile_path(filename_dir, var, filename_first, dirout, comp, write=False):
+
+    comp_name = f'{comp["comp_method"]}_{comp["comp_mode"]}_{comp["comp_level"]}'
+    path_zarr = f'{dirout}/{comp_name}/{filename_first}.zarr'
+    path_nc = f'{dirout}/{comp_name}/{filename_first}.nc'
+    if write and exists(path_zarr):
+        shutil.rmtree(path_zarr)
+    return path_zarr, path_nc
+
 def output_path(cmpn, frequency, var, filename_first, dirout, comp, write=False):
     comp_name = f'{comp["comp_method"]}_{comp["comp_mode"]}_{comp["comp_level"]}'
     path_zarr = f'{dirout}/{cmpn}/{comp_name}/{frequency}/{filename_first}.zarr'
@@ -82,15 +91,29 @@ def output_path(cmpn, frequency, var, filename_first, dirout, comp, write=False)
     return path_zarr, path_nc
 
 
+def parse_singlefile(filename):
+   
+
+    filename_only = basename(filename)
+    res = re.split(r'\.', filename_only)
+    varname = res[0]
+    filename_first = filename_only[:-3]
+    filename_dir = dirname(filename)
+    print(filename_only, filename_first, filename_dir)
+
+    return varname, filename_dir, filename_first
+    
 def parse_filename(filename):
 
     res = re.split(r'\/', filename)
     cmpn = res[6] + '/' + res[7]
     frequency = res[9]
-    filename_only = res[-1]
+    filename_only = basename(filename)
     res = re.split(r'\.', filename_only)
-    filename_first = basename(filename)
+    filename_first = filename_only[:-3]
     varname = res[7]
+
+        
     return varname, cmpn, frequency, filename_first
 
 
@@ -148,8 +171,10 @@ class Runner:
         maxcore_per_node = self.params['maxcore_per_node']
         num_workers = self.params['number_of_workers_per_nodes']
         num_nodes = self.params['number_of_nodes']
+        LENS = self.params['LENS']
         input_dir = self.params['input_dir']
         output_dir = self.params['output_dir']
+        num_files = self.params['index_of_files']
         compression = self.params['compression']
         logger.warning(memory)
         logger.warning(maxcore_per_node)
@@ -168,28 +193,32 @@ class Runner:
 
         files = glob.glob(input_dir)
         pre = {}
-        start = 28
         for counter, i in enumerate(files):
-            if counter > start + 1:
+            print(i)
+            if counter > num_files['start'] + 1 and (counter <= num_files['end'] + 1):
                 get_filesize(pre)
-            if counter > 88:
-                varname, cmpn, frequency, filename_first = parse_filename(i)
-                if varname in ['FICE', 'TOT_CLD_VISTAU', 'Z3', 'VQ', 'OMEGA', 'U']:
-                    continue
+            if (counter > num_files['start']) and (counter <= num_files['end']):
+                if LENS:
+                    varname, cmpn, frequency, filename_first = parse_filename(i)
+                else:
+                    varname, filename_dir, filename_first = parse_singlefile(i)
+                    
                 with xr.open_dataset(i) as ds:
-                    path_zarr, path_nc = output_path(
-                        cmpn, frequency, varname, filename_first, output_dir, compression
-                    )
+                    if LENS:
+                        path_zarr, path_nc = output_path(
+                            cmpn, frequency, varname, filename_first, output_dir, compression
+                        )
+                    else:
+                        path_zarr, path_nc = output_singlefile_path(
+                            filename_dir, varname, filename_first, output_dir, compression
+                       )    
                     pre['var'] = varname
                     pre['zarr'] = path_zarr
                     pre['nc'] = path_nc
                     convert_zarr(ds, varname, path_zarr, compression)
                     write_to_netcdf(path_zarr, path_nc)
-        # ds = xr.open_dataset(
-        #    input_file, chunks={'nVertLevels': 1, 'nCells': 2621442, 'nVertLevelsP1': 1}
-        # )
 
-        logger.warning(ds)
+        #logger.warning(ds)
         logger.warning('done')
         self.client.cluster.close()
         self.client.close()

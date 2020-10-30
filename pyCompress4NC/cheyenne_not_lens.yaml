@@ -4,8 +4,8 @@ memory: 109GB
 maxcore_per_node: 36
 number_of_workers_per_nodes: 10
 number_of_nodes: 1
-LENS: True
-input_dir: /glade/p/cisl/asap/abaker/pepsi/ens_31/orig/monthly/*.nc
+LENS: False
+input_dir: /glade/p/cisl/asap/ldcpy_sample_data/lens/orig/*.nc
 output_dir: /glade/scratch/haiyingx
 index_of_files: 
     start: 0

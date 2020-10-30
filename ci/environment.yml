@@ -2,6 +2,7 @@ name: pyCompress4NC
 channels:
   - conda-forge
 dependencies:
+  - click
   - codecov
   - dask
   - nbsphinx

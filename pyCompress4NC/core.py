@@ -57,7 +57,7 @@ def convert_zarr(ds, varname, path_zarr, comp):
     else:
         x = ceil(ds[varname].nbytes / 201326592)
         timestep = int(ds[varname].sizes['time'] / x)
-    print(timestep)
+    #print(timestep)
     ds1 = ds.chunk(chunks={'time': timestep})
     ds1[varname].encoding['compressor'] = compressor
 
@@ -97,11 +97,12 @@ def parse_singlefile(filename):
     filename_only = basename(filename)
     res = re.split(r'\.', filename_only)
     varname = res[0]
+    period = res[2]
     filename_first = filename_only[:-3]
     filename_dir = dirname(filename)
-    print(filename_only, filename_first, filename_dir)
+    #print(filename_only, filename_first, filename_dir)
 
-    return varname, filename_dir, filename_first
+    return varname, period, filename_dir, filename_first
     
 def parse_filename(filename):
 
@@ -112,12 +113,13 @@ def parse_filename(filename):
     res = re.split(r'\.', filename_only)
     filename_first = filename_only[:-3]
     varname = res[7]
+    period = res[8]
 
         
-    return varname, cmpn, frequency, filename_first
+    return varname, period, cmpn, frequency, filename_first
 
 
-def get_filesize(file_dict):
+def get_filesize(file_dict, period):
 
     for k, v in file_dict.items():
         if k == 'zarr':
@@ -129,11 +131,11 @@ def get_filesize(file_dict):
             temp = re.split(r'\.', info)[-5]
             origsize = re.split(r' ', temp)[-2]
 
-            print(f'{file_dict["var"]} orig {origsize}')
-            print(f'{file_dict["var"]} {k} {filesize}')
+            print(f'{file_dict["var"]} {period} orig {origsize}')
+            print(f'{file_dict["var"]} {period} {k} {filesize}')
         elif k == 'nc':
             filesize = getsize(v)
-            print(f'{file_dict["var"]} {k} {filesize}')
+            print(f'{file_dict["var"]} {period} {k} {filesize}')
 
 
 class Runner:
@@ -194,14 +196,14 @@ class Runner:
         files = glob.glob(input_dir)
         pre = {}
         for counter, i in enumerate(files):
-            print(i)
-            if counter > num_files['start'] + 1 and (counter <= num_files['end'] + 1):
-                get_filesize(pre)
-            if (counter > num_files['start']) and (counter <= num_files['end']):
+            #print(i)
+            #if counter > num_files['start']  and (counter <= num_files['end'] + 1):
+            #    get_filesize(pre)
+            if (counter >= num_files['start']) and (counter < num_files['end']):
                 if LENS:
-                    varname, cmpn, frequency, filename_first = parse_filename(i)
+                    varname, period, cmpn, frequency, filename_first = parse_filename(i)
                 else:
-                    varname, filename_dir, filename_first = parse_singlefile(i)
+                    varname, period, filename_dir, filename_first = parse_singlefile(i)
                     
                 with xr.open_dataset(i) as ds:
                     if LENS:
@@ -217,6 +219,7 @@ class Runner:
                     pre['nc'] = path_nc
                     convert_zarr(ds, varname, path_zarr, compression)
                     write_to_netcdf(path_zarr, path_nc)
+                    get_filesize(pre, period)
 
         #logger.warning(ds)
         logger.warning('done')

@@ -57,7 +57,7 @@ def convert_zarr(ds, varname, path_zarr, comp):
     else:
         x = ceil(ds[varname].nbytes / 201326592)
         timestep = int(ds[varname].sizes['time'] / x)
-    #print(timestep)
+    # print(timestep)
     ds1 = ds.chunk(chunks={'time': timestep})
     ds1[varname].encoding['compressor'] = compressor
 
@@ -82,6 +82,7 @@ def output_singlefile_path(filename_dir, var, filename_first, dirout, comp, writ
         shutil.rmtree(path_zarr)
     return path_zarr, path_nc
 
+
 def output_path(cmpn, frequency, var, filename_first, dirout, comp, write=False):
     comp_name = f'{comp["comp_method"]}_{comp["comp_mode"]}_{comp["comp_level"]}'
     path_zarr = f'{dirout}/{cmpn}/{comp_name}/{frequency}/{filename_first}.zarr'
@@ -92,7 +93,6 @@ def output_path(cmpn, frequency, var, filename_first, dirout, comp, write=False)
 
 
 def parse_singlefile(filename):
-   
 
     filename_only = basename(filename)
     res = re.split(r'\.', filename_only)
@@ -100,10 +100,11 @@ def parse_singlefile(filename):
     period = res[2]
     filename_first = filename_only[:-3]
     filename_dir = dirname(filename)
-    #print(filename_only, filename_first, filename_dir)
+    # print(filename_only, filename_first, filename_dir)
 
     return varname, period, filename_dir, filename_first
-    
+
+
 def parse_filename(filename):
 
     res = re.split(r'\/', filename)
@@ -115,7 +116,6 @@ def parse_filename(filename):
     varname = res[7]
     period = res[8]
 
-        
     return varname, period, cmpn, frequency, filename_first
 
 
@@ -196,15 +196,15 @@ class Runner:
         files = glob.glob(input_dir)
         pre = {}
         for counter, i in enumerate(files):
-            #print(i)
-            #if counter > num_files['start']  and (counter <= num_files['end'] + 1):
+            # print(i)
+            # if counter > num_files['start']  and (counter <= num_files['end'] + 1):
             #    get_filesize(pre)
             if (counter >= num_files['start']) and (counter < num_files['end']):
                 if LENS:
                     varname, period, cmpn, frequency, filename_first = parse_filename(i)
                 else:
                     varname, period, filename_dir, filename_first = parse_singlefile(i)
-                    
+
                 with xr.open_dataset(i) as ds:
                     if LENS:
                         path_zarr, path_nc = output_path(
@@ -213,7 +213,7 @@ class Runner:
                     else:
                         path_zarr, path_nc = output_singlefile_path(
                             filename_dir, varname, filename_first, output_dir, compression
-                       )    
+                        )
                     pre['var'] = varname
                     pre['zarr'] = path_zarr
                     pre['nc'] = path_nc
@@ -221,7 +221,7 @@ class Runner:
                     write_to_netcdf(path_zarr, path_nc)
                     get_filesize(pre, period)
 
-        #logger.warning(ds)
+        logger.warning(ds)
         logger.warning('done')
         self.client.cluster.close()
         self.client.close()

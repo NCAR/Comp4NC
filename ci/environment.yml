@@ -5,6 +5,7 @@ dependencies:
   - click
   - codecov
   - dask
+  - dask-jobqueue
   - nbsphinx
   - netcdf4
   - numpydoc

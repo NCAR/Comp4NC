@@ -44,6 +44,11 @@ Also, please install `pre-commit` hooks from the root directory of the created p
 
 These code style pre-commit hooks (black, isort, flake8, ...) will run every time you are about to commit code.
 
+Before run the codes::
+     
+      export PBS_ACCOUNT=youraccount #in .bash_profile
+      setenv PBS_ACCOUNT youraccount #in .tcshrc
+
 To run the codes::
 
       ./pyCompress pyCompress4NC/cheyenne.yaml

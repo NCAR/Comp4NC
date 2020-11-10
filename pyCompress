@@ -8,9 +8,20 @@ from pyCompress4NC.core import Runner
 
 
 @click.command()
-@click.argument('config_file', type=click.Path(exists=True))
-def cli(config_file):
-    runner = Runner(config_file)
+@click.option(
+    '--config_file',
+    type=click.Path(exists=True),
+    help='Config yaml file to include all options that are passed in command line',
+)
+@click.option('--input_file', type=click.File('r'), help='Input file name')
+@click.option('--output_file', default='foo', type=click.File('w'), help='Output file name')
+@click.option(
+    '--comp_method', default='zlib', help='Specify which compression method will be used.'
+)
+@click.option('--comp_mode', default='', help='Specify which compression mode will be used.')
+@click.option('--comp_level', default=1, help='Specify which compression level will be used.')
+def cli(config_file, input_file, output_file, comp_method, comp_mode, comp_level):
+    runner = Runner(config_file, input_file, output_file, comp_method, comp_mode, comp_level)
     runner.run()
 
 

@@ -4,13 +4,13 @@ memory: 109GB
 maxcore_per_node: 36
 number_of_workers_per_nodes: 10
 number_of_nodes: 1
-LENS: True
+to_nc: True
 input_dir: /glade/p/cisl/asap/abaker/pepsi/ens_31/orig/monthly/*.nc
 output_dir: /glade/scratch/haiyingx
-index_of_files: 
+index_of_files:
     start: 0
-    end: 2
+    end: 4
 compression:
     comp_method: zfp
-    comp_mode: a
-    comp_level: 0.01
+    comp_mode: p
+    comp_level: 12

@@ -41,14 +41,16 @@ def convert_zarr(ds, varname, path_zarr, comp):
 
     if comp['comp_mode'] == 'a':
         m = _zfpy.mode_fixed_accuracy
+        compressor = ZFPY(mode=m, tolerance=comp['comp_level'])
     elif comp['comp_mode'] == 'p':
         m = _zfpy.mode_fixed_precision
+        compressor = ZFPY(mode=m, precision=comp['comp_level'])
     elif comp['comp_mode'] == 'r':
         m = _zfpy.mode_fixed_rate
+        compressor = ZFPY(mode=m, rate=comp['comp_level'])
     else:
         print('Wrong zfp compression mode')
 
-    compressor = ZFPY(mode=m, tolerance=comp['comp_level'])
     # zarr.storage.default_compressor = compressor
 
     """ Check if variable data nbytes are less than 192MB """
@@ -71,6 +73,7 @@ def write_to_netcdf(path_zarr, path_nc):
     encoding = {var: comp for var in ds.data_vars}
 
     ds.to_netcdf(path_nc, encoding=encoding)
+    shutil.rmtree(path_zarr)
 
 
 def output_singlefile_path(filename_dir, var, filename_first, dirout, comp, write=False):
@@ -119,34 +122,48 @@ def parse_filename(filename):
     return varname, period, cmpn, frequency, filename_first
 
 
-def get_filesize(file_dict, period):
+def get_filesize(file_dict, period, to_nc):
 
     for k, v in file_dict.items():
-        if k == 'zarr':
+        origsize = getsize(file_dict['orig'])
+        if k == 'zarr' and not to_nc:
             """ Parse zarr info to get compressed file size """
             filename = zarr.open(v, mode='r')
             info = str(filename[file_dict['var']].info)
             temp = re.split(r'\.', info)[-3]
             filesize = re.split(r' ', temp)[-2]
             temp = re.split(r'\.', info)[-5]
-            origsize = re.split(r' ', temp)[-2]
+            nocompsize = re.split(r' ', temp)[-2]
 
             print(f'{file_dict["var"]} {period} orig {origsize}')
+            print(f'{file_dict["var"]} {period} no_comp {nocompsize}')
             print(f'{file_dict["var"]} {period} {k} {filesize}')
-        elif k == 'nc':
+        elif k == 'nc' and to_nc:
             filesize = getsize(v)
+            print(f'{file_dict["var"]} {period} orig {origsize}')
             print(f'{file_dict["var"]} {period} {k} {filesize}')
 
 
 class Runner:
-    def __init__(self, input_file):
-        import yaml
+    def __init__(self, config_file, input_file, output_file, comp_method, comp_mode, comp_level):
 
-        try:
-            with open(input_file) as f:
-                self.params = yaml.safe_load(f)
-        except Exception as exc:
-            raise exc
+        if config_file:
+            import yaml
+
+            try:
+                with open(config_file) as f:
+                    self.params = yaml.safe_load(f)
+            except Exception as exc:
+                raise exc
+        else:
+            self.params = {}
+            compression = {}
+            compression['comp_method'] = comp_method
+            compression['comp_mode'] = comp_mode
+            compression['comp_level'] = comp_level
+            self.params['compression'] = compression
+            self.params['input_file'] = input_file
+            self.params['output_file'] = output_file
         self.client = None
 
     def create_cluster(self, queue, maxcore, memory, wpn, walltime):
@@ -173,7 +190,8 @@ class Runner:
         maxcore_per_node = self.params['maxcore_per_node']
         num_workers = self.params['number_of_workers_per_nodes']
         num_nodes = self.params['number_of_nodes']
-        LENS = self.params['LENS']
+        LENS = False
+        to_nc = self.params['to_nc']
         input_dir = self.params['input_dir']
         output_dir = self.params['output_dir']
         num_files = self.params['index_of_files']
@@ -215,13 +233,15 @@ class Runner:
                             filename_dir, varname, filename_first, output_dir, compression
                         )
                     pre['var'] = varname
+                    pre['orig'] = i
                     pre['zarr'] = path_zarr
                     pre['nc'] = path_nc
                     convert_zarr(ds, varname, path_zarr, compression)
-                    write_to_netcdf(path_zarr, path_nc)
-                    get_filesize(pre, period)
+                    if to_nc:
+                        write_to_netcdf(path_zarr, path_nc)
+                    get_filesize(pre, period, to_nc)
 
-        logger.warning(ds)
+        # logger.warning(ds)
         logger.warning('done')
         self.client.cluster.close()
         self.client.close()

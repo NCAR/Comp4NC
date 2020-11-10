@@ -145,25 +145,25 @@ def get_filesize(file_dict, period, to_nc):
 
 
 class Runner:
-    def __init__(self, config_file, input_file, output_file, comp_method, comp_mode, comp_level):
+    def __init__(self, **context_dict):
 
-        if config_file:
+        if 'config_file' in context_dict:
             import yaml
 
             try:
-                with open(config_file) as f:
+                with open(context_dict['config_file']) as f:
                     self.params = yaml.safe_load(f)
             except Exception as exc:
                 raise exc
         else:
             self.params = {}
             compression = {}
-            compression['comp_method'] = comp_method
-            compression['comp_mode'] = comp_mode
-            compression['comp_level'] = comp_level
+            compression['comp_method'] = context_dict['comp_method']
+            compression['comp_mode'] = context_dict['comp_mode']
+            compression['comp_level'] = context_dict['comp_level']
             self.params['compression'] = compression
-            self.params['input_file'] = input_file
-            self.params['output_file'] = output_file
+            self.params['input_file'] = context_dict['input_file']
+            self.params['output_file'] = context_dict['output_file']
         self.client = None
 
     def create_cluster(self, queue, maxcore, memory, wpn, walltime):

@@ -97,9 +97,9 @@ Command line options::
 
       --help                          Show this message and exit.
 
-To run the codes with command lines::
+To run the codes from command lines with compression zfp in p mode, keeping 16 bits and outputing to netcdf format parallelly::
 
-    ./pyCompress --input_file /glade/p/cisl/asap/ldcpy_sample_data/lens/orig/TS.daily.20060101-20801231.nc --comp_method zfp --comp_mode a --comp_level 0.1 --parallel --to_nc
+    ./pyCompress --input_file /glade/p/cisl/asap/ldcpy_sample_data/lens/orig/TS.daily.20060101-20801231.nc --comp_method zfp --comp_mode p --comp_level 16 --parallel --to_nc
 
 Re-create notebooks with Pangeo Binder
 --------------------------------------

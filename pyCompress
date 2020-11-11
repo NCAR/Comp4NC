@@ -11,21 +11,93 @@ from pyCompress4NC.core import Runner
 @click.option(
     '--config_file',
     type=click.Path(exists=True),
-    help='Config yaml file to include all options that are passed in command line',
+    help='Yaml file to set all input parameters, can replace command line parameters',
 )
-@click.option('--input_file', type=click.File('r'), help='Input file name')
-@click.option('--output_file', default='foo.zarr', type=click.File('w'), help='Output file name')
+@click.option('--queue', default='regular', help='Cluster queue name', show_default=True)
 @click.option(
-    '--comp_method', default='zlib', help='Specify which compression method will be used.'
+    '--walltime', default='1:00:00', help='Expected walltime of the job', show_default=True
 )
-@click.option('--comp_mode', default='', help='Specify which compression mode will be used.')
-@click.option('--comp_level', default=1, help='Specify which compression level will be used.')
+@click.option(
+    '--memory',
+    default='109GB',
+    help='Expected memory needed on each computing node',
+    show_default=True,
+)
+@click.option(
+    '--maxcore_per_node', default=36, help='Core count on each computing node', show_default=True
+)
+@click.option(
+    '--number_of_workers_per_nodes',
+    default=10,
+    help='Number of cores required on each node',
+    show_default=True,
+)
+@click.option('--number_of_nodes', default=1, help='Number of nodes required', show_default=True)
+@click.option('--to_nc', is_flag=True, help='Writing to netcdf format', show_default=True)
+@click.option('--parallel', is_flag=True, help='Running in parallel mode', show_default=True)
+@click.option('--input_file', type=click.Path(exists=True), help='Input file name')
+@click.option('--input_dir', type=click.Path(), help='Input directory name')
+@click.option(
+    '--output_dir', default='.', type=click.Path(), help='Output directory name', show_default=True
+)
+@click.option(
+    '--start', default=0, help='Start index of the file in a file list', show_default=True
+)
+@click.option('--end', default=1, help='End index of the file in a file list', show_default=True)
+@click.option(
+    '--comp_method',
+    default='zfp',
+    help='Specify which compression method will be used on time variant variable.',
+    show_default=True,
+)
+@click.option(
+    '--comp_mode',
+    default='a',
+    help='Specify which compression mode will be used.',
+    show_default=True,
+)
+@click.option(
+    '--comp_level',
+    default=0.1,
+    help='Specify which compression level will be used.',
+    show_default=True,
+)
 @click.pass_context
-def cli(context, config_file, input_file, output_file, comp_method, comp_mode, comp_level):
+def cli(
+    context,
+    config_file,
+    queue,
+    walltime,
+    memory,
+    maxcore_per_node,
+    number_of_workers_per_nodes,
+    number_of_nodes,
+    to_nc,
+    parallel,
+    input_file,
+    input_dir,
+    output_dir,
+    start,
+    end,
+    comp_method,
+    comp_mode,
+    comp_level,
+):
     context.obj = {
         'config_file': config_file,
+        'queue': queue,
+        'walltime': walltime,
+        'memory': memory,
+        'maxcore_per_node': maxcore_per_node,
+        'number_of_workers_per_nodes': number_of_workers_per_nodes,
+        'number_of_nodes': number_of_nodes,
+        'to_nc': to_nc,
+        'parallel': parallel,
         'input_file': input_file,
-        'output_file': output_file,
+        'input_dir': input_dir,
+        'output_dir': output_dir,
+        'start': start,
+        'end': end,
         'comp_method': comp_method,
         'comp_mode': comp_mode,
         'comp_level': comp_level,

@@ -26,32 +26,80 @@
 pyCompress4NC
 =============
 
-Development
+Production
 ------------
 
-For a development install, do the following in the repository directory:
+For a production install, do the following in the repository directory:
 
 .. code-block:: bash
 
+    git clone https://github.com/NCAR/Comp4NC.git
+    cd Comp4NC
     conda env update -f ci/environment.yml
     conda activate pyCompress4NC
     python -m pip install -e .
 
-Also, please install `pre-commit` hooks from the root directory of the created project by running::
-
-      python -m pip install pre-commit
-      pre-commit install
-
-These code style pre-commit hooks (black, isort, flake8, ...) will run every time you are about to commit code.
-
 Before run the codes::
-     
-      export PBS_ACCOUNT=youraccount #in .bash_profile
-      setenv PBS_ACCOUNT youraccount #in .tcshrc
 
-To run the codes::
+    export PBS_ACCOUNT=youraccount #in .bash_profile
+    setenv PBS_ACCOUNT youraccount #in .tcshrc
 
-      ./pyCompress pyCompress4NC/cheyenne.yaml
+To run the codes with config file as input::
+
+    ./pyCompress --config_file pyCompress4NC/cheyenne.yaml
+
+
+To get help with command lines::
+
+    ./pyCompress --help
+
+Command line options::
+
+    Options:
+      --config_file PATH              Yaml file to set all input parameters, can
+                                      replace command line parameters
+
+      --queue TEXT                    Cluster queue name  [default: regular]
+      --walltime TEXT                 Expected walltime of the job  [default:
+                                      1:00:00]
+
+      --memory TEXT                   Expected memory needed on each computing
+                                      node  [default: 109GB]
+
+      --maxcore_per_node INTEGER      Core count on each computing node  [default:
+                                      36]
+
+      --number_of_workers_per_nodes INTEGER
+                                      Number of cores required on each node
+                                      [default: 10]
+
+      --number_of_nodes INTEGER       Number of nodes required  [default: 1]
+      --to_nc                         Writing to netcdf format  [default: False]
+      --parallel                      Running in parallel mode  [default: False]
+      --input_file PATH               Input file name
+      --input_dir PATH                Input directory name
+      --output_dir PATH               Output directory name  [default: .]
+      --start INTEGER                 Start index of the file in a file list
+                                      [default: 0]
+
+      --end INTEGER                   End index of the file in a file list
+                                      [default: 1]
+
+      --comp_method TEXT              Specify which compression method will be
+                                      used on time variant variable.  [default:
+                                      zfp]
+
+      --comp_mode TEXT                Specify which compression mode (a, p, r) will be used.
+                                      [default: a]
+
+      --comp_level FLOAT              Specify which compression level will be
+                                      used.  [default: 0.1]
+
+      --help                          Show this message and exit.
+
+To run the codes with command lines::
+
+    ./pyCompress --input_file /glade/p/cisl/asap/ldcpy_sample_data/lens/orig/TS.daily.20060101-20801231.nc --comp_method zfp --comp_mode a --comp_level 0.1 --parallel --to_nc
 
 Re-create notebooks with Pangeo Binder
 --------------------------------------

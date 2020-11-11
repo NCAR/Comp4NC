@@ -41,13 +41,13 @@ def convert_zarr(ds, varname, path_zarr, comp):
 
     if comp['comp_mode'] == 'a':
         m = _zfpy.mode_fixed_accuracy
-        compressor = ZFPY(mode=m, tolerance=comp['comp_level'])
+        compressor = ZFPY(mode=m, tolerance=float(comp['comp_level']))
     elif comp['comp_mode'] == 'p':
         m = _zfpy.mode_fixed_precision
-        compressor = ZFPY(mode=m, precision=comp['comp_level'])
+        compressor = ZFPY(mode=m, precision=int(comp['comp_level']))
     elif comp['comp_mode'] == 'r':
         m = _zfpy.mode_fixed_rate
-        compressor = ZFPY(mode=m, rate=comp['comp_level'])
+        compressor = ZFPY(mode=m, rate=int(comp['comp_level']))
     else:
         print('Wrong zfp compression mode')
 
@@ -96,7 +96,6 @@ def output_path(cmpn, frequency, var, filename_first, dirout, comp, write=False)
 
 
 def parse_singlefile(filename):
-
     filename_only = basename(filename)
     res = re.split(r'\.', filename_only)
     varname = res[0]
@@ -147,7 +146,7 @@ def get_filesize(file_dict, period, to_nc):
 class Runner:
     def __init__(self, **context_dict):
 
-        if 'config_file' in context_dict:
+        if context_dict['config_file']:
             import yaml
 
             try:
@@ -156,14 +155,16 @@ class Runner:
             except Exception as exc:
                 raise exc
         else:
-            self.params = {}
+            self.params = context_dict
             compression = {}
+            index_of_files = {}
             compression['comp_method'] = context_dict['comp_method']
             compression['comp_mode'] = context_dict['comp_mode']
             compression['comp_level'] = context_dict['comp_level']
+            index_of_files['start'] = context_dict['start']
+            index_of_files['end'] = context_dict['end']
             self.params['compression'] = compression
-            self.params['input_file'] = context_dict['input_file']
-            self.params['output_file'] = context_dict['output_file']
+            self.params['index_of_files'] = index_of_files
         self.client = None
 
     def create_cluster(self, queue, maxcore, memory, wpn, walltime):
@@ -176,14 +177,12 @@ class Runner:
             walltime=walltime,
             # resource_spec='select=1:ncpus=36:mem=109GB',
         )
-        logger.warning(memory)
-        logger.warning(walltime)
         # resource_spec='select=1:ncpus=36:mem=109GB')
         logger.warning(cluster.job_script())
         self.client = Client(cluster)
 
     def run(self):
-        logger.warning('Reading configuration YAML config file')
+        # logger.warning('Reading configuration YAML config file')
         queue = self.params['queue']
         walltime = self.params['walltime']
         memory = self.params['memory']
@@ -191,32 +190,37 @@ class Runner:
         num_workers = self.params['number_of_workers_per_nodes']
         num_nodes = self.params['number_of_nodes']
         LENS = False
+        parallel = self.params['parallel']
         to_nc = self.params['to_nc']
+        input_file = self.params['input_file']
         input_dir = self.params['input_dir']
         output_dir = self.params['output_dir']
         num_files = self.params['index_of_files']
         compression = self.params['compression']
-        logger.warning(memory)
-        logger.warning(maxcore_per_node)
-        logger.warning(num_nodes)
-        logger.warning(num_workers)
-        logger.warning(input_dir)
-        logger.warning(output_dir)
-        logger.warning(walltime)
-        self.create_cluster(queue, maxcore_per_node, memory, num_workers, walltime)
-        self.client.cluster.scale(n=num_nodes * num_workers)
-        logger.warning('scale')
-        # sleep(10)
-        self.client.wait_for_workers(num_nodes * num_workers)
-        logger.warning('wait')
-        # cluster_wait(self.client, num_nodes * num_workers)
 
-        files = glob.glob(input_dir)
+        # logger.warning(memory)
+        # logger.warning(maxcore_per_node)
+        # logger.warning(num_nodes)
+        # logger.warning(num_workers)
+        # logger.warning(input_dir)
+        # logger.warning(output_dir)
+        # logger.warning(walltime)
+        if parallel:
+            self.create_cluster(queue, maxcore_per_node, memory, num_workers, walltime)
+            self.client.cluster.scale(n=num_nodes * num_workers)
+            logger.warning('scale')
+            # sleep(10)
+            self.client.wait_for_workers(num_nodes * num_workers)
+            logger.warning('wait')
+            # cluster_wait(self.client, num_nodes * num_workers)
+
+        if exists(input_file):
+
+            files = [input_file]
+        else:
+            files = glob.glob(input_dir)
         pre = {}
         for counter, i in enumerate(files):
-            # print(i)
-            # if counter > num_files['start']  and (counter <= num_files['end'] + 1):
-            #    get_filesize(pre)
             if (counter >= num_files['start']) and (counter < num_files['end']):
                 if LENS:
                     varname, period, cmpn, frequency, filename_first = parse_filename(i)
@@ -243,6 +247,7 @@ class Runner:
 
         # logger.warning(ds)
         logger.warning('done')
-        self.client.cluster.close()
-        self.client.close()
+        if parallel:
+            self.client.cluster.close()
+            self.client.close()
         return ds

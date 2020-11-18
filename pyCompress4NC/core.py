@@ -37,7 +37,7 @@ def cluster_wait(client, n_workers):
             break
 
 
-def convert_zarr(ds, varname, path_zarr, comp):
+def convert_zarr(ds, varname, chunkable_dim, path_zarr, comp):
 
     if comp['comp_mode'] == 'a':
         m = _zfpy.mode_fixed_accuracy
@@ -54,14 +54,13 @@ def convert_zarr(ds, varname, path_zarr, comp):
     # zarr.storage.default_compressor = compressor
 
     """ Check if variable data nbytes are less than 192MB """
-    if ds[varname].nbytes < 201326592:
-        timestep = -1
-    else:
-        x = ceil(ds[varname].nbytes / 201326592)
-        timestep = int(ds[varname].sizes['time'] / x)
-    # print(timestep)
-    ds1 = ds.chunk(chunks={'time': timestep})
-    ds1[varname].encoding['compressor'] = compressor
+    ds1 = None
+    for _varname in ds.data_vars:
+        print(ds[_varname].sizes)
+        if ds1 is None and len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
+            ds1 = ds.chunk(chunks={chunkable_dim['name']: chunkable_dim['chunk_size']})
+        if ds1:
+            ds1[_varname].encoding['compressor'] = compressor
 
     ds1.to_zarr(path_zarr, mode='w', consolidated=True)
 
@@ -70,7 +69,9 @@ def write_to_netcdf(path_zarr, path_nc):
 
     ds = xr.open_zarr(path_zarr)
     comp = dict(zlib=True, complevel=5)
-    encoding = {var: comp for var in ds.data_vars}
+    encoding = {
+        var: comp for var in ds.data_vars if len(ds[var].dims) >= 2 and ds[var].dtype == 'float32'
+    }
 
     ds.to_netcdf(path_nc, encoding=encoding)
     shutil.rmtree(path_zarr)
@@ -197,6 +198,7 @@ class Runner:
         output_dir = self.params['output_dir']
         num_files = self.params['index_of_files']
         compression = self.params['compression']
+        chunkable_dim = self.params['chunkable_dimension']
 
         # logger.warning(memory)
         # logger.warning(maxcore_per_node)
@@ -240,10 +242,10 @@ class Runner:
                     pre['orig'] = i
                     pre['zarr'] = path_zarr
                     pre['nc'] = path_nc
-                    convert_zarr(ds, varname, path_zarr, compression)
+                    convert_zarr(ds, varname, chunkable_dim, path_zarr, compression)
                     if to_nc:
                         write_to_netcdf(path_zarr, path_nc)
-                    get_filesize(pre, period, to_nc)
+                    # get_filesize(pre, period, to_nc)
 
         # logger.warning(ds)
         logger.warning('done')

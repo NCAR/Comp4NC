@@ -4,9 +4,9 @@ memory: 109GB
 maxcore_per_node: 36
 number_of_workers_per_nodes: 1
 number_of_nodes: 10
-to_nc: False
+to_nc: True
 parallel: True
-input_file: /glade/scratch/fjudt/projects/ongoing/dyamond/dyamond_1/runs/3.75km/history.2016-09-10_00.00.00.nc
+input_file: /glade/work/haiyingx/30kmHistory/history_state.2010-10-23_00.03.00.nc
 input_dir: /glade/p/cisl/asap/ldcpy_sample_data/lens/orig/*.nc
 output_dir: /glade/scratch/haiyingx
 index_of_files:
@@ -14,8 +14,8 @@ index_of_files:
     end: 1
 compression:
     comp_method: zfp
-    comp_mode: a
-    comp_level: 0.1
+    comp_mode: p
+    comp_level: 12
 chunkable_dimension:
-    name: nCells
-    chunk_size: 4194305
+    nCells: 655362
+    nEdges: 655362

@@ -3,7 +3,9 @@ import logging
 import re
 import shutil
 from math import ceil
+from os import walk
 from os.path import abspath, basename, dirname, exists, getsize, join
+from pathlib import Path
 from time import sleep, time
 
 import click
@@ -54,12 +56,9 @@ def convert_zarr(ds, varname, chunkable_dim, path_zarr, comp):
     # zarr.storage.default_compressor = compressor
 
     """ Check if variable data nbytes are less than 192MB """
-    ds1 = None
+    ds1 = ds.chunk(chunks=chunkable_dim)
     for _varname in ds.data_vars:
-        print(ds[_varname].sizes)
-        if ds1 is None and len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
-            ds1 = ds.chunk(chunks={chunkable_dim['name']: chunkable_dim['chunk_size']})
-        if ds1:
+        if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
             ds1[_varname].encoding['compressor'] = compressor
 
     ds1.to_zarr(path_zarr, mode='w', consolidated=True)
@@ -126,22 +125,17 @@ def get_filesize(file_dict, period, to_nc):
 
     for k, v in file_dict.items():
         origsize = getsize(file_dict['orig'])
+        filesize = 0
         if k == 'zarr' and not to_nc:
             """ Parse zarr info to get compressed file size """
-            filename = zarr.open(v, mode='r')
-            info = str(filename[file_dict['var']].info)
-            temp = re.split(r'\.', info)[-3]
-            filesize = re.split(r' ', temp)[-2]
-            temp = re.split(r'\.', info)[-5]
-            nocompsize = re.split(r' ', temp)[-2]
+            filesize = sum(p.stat().st_size for p in Path(v).rglob('*'))
 
-            print(f'{file_dict["var"]} {period} orig {origsize}')
-            print(f'{file_dict["var"]} {period} no_comp {nocompsize}')
-            print(f'{file_dict["var"]} {period} {k} {filesize}')
+            print(f'{basename(file_dict["orig"])} input size {origsize}')
+            print(f'{basename(file_dict["zarr"])} {k} size {filesize}')
         elif k == 'nc' and to_nc:
             filesize = getsize(v)
-            print(f'{file_dict["var"]} {period} orig {origsize}')
-            print(f'{file_dict["var"]} {period} {k} {filesize}')
+            print(f'{basename(file_dict["orig"])} input size {origsize}')
+            print(f'{basename(file_dict["nc"])} {k} size {filesize}')
 
 
 class Runner:
@@ -243,12 +237,13 @@ class Runner:
                     pre['zarr'] = path_zarr
                     pre['nc'] = path_nc
                     convert_zarr(ds, varname, chunkable_dim, path_zarr, compression)
+                    print(i, '... Done')
                     if to_nc:
                         write_to_netcdf(path_zarr, path_nc)
-                    # get_filesize(pre, period, to_nc)
+                    get_filesize(pre, period, to_nc)
 
         # logger.warning(ds)
-        logger.warning('done')
+        logger.warning('All done')
         if parallel:
             self.client.cluster.close()
             self.client.close()

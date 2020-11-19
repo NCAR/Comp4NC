@@ -35,8 +35,22 @@ from pyCompress4NC.core import Runner
 @click.option('--number_of_nodes', default=1, help='Number of nodes required', show_default=True)
 @click.option('--to_nc', is_flag=True, help='Writing to netcdf format', show_default=True)
 @click.option('--parallel', is_flag=True, help='Running in parallel mode', show_default=True)
-@click.option('--input_file', type=click.Path(exists=True), help='Input file name')
-@click.option('--input_dir', type=click.Path(), help='Input directory name')
+@click.option(
+    '--split_nc',
+    is_flag=True,
+    help='Write out several NetCDF files for each one input file',
+    show_default=True,
+)
+@click.option(
+    '--input_file',
+    type=click.Path(),
+    help='Single input file name with absolute path, if set, input_file will be used instead of input_dir.',
+)
+@click.option(
+    '--input_dir',
+    type=click.Path(),
+    help='Input directory name, will be used if input_file is not set "", otherwise will not be used.',
+)
 @click.option(
     '--output_dir', default='.', type=click.Path(), help='Output directory name', show_default=True
 )
@@ -62,6 +76,12 @@ from pyCompress4NC.core import Runner
     help='Specify which compression level will be used.',
     show_default=True,
 )
+@click.option(
+    '--chunkable_dimension',
+    default={},
+    help='Specify the chunk size for some dimension.',
+    show_default=True,
+)
 @click.pass_context
 def cli(
     context,
@@ -74,6 +94,7 @@ def cli(
     number_of_nodes,
     to_nc,
     parallel,
+    split_nc,
     input_file,
     input_dir,
     output_dir,
@@ -82,6 +103,7 @@ def cli(
     comp_method,
     comp_mode,
     comp_level,
+    chunkable_dimension,
 ):
     context.obj = {
         'config_file': config_file,
@@ -93,6 +115,7 @@ def cli(
         'number_of_nodes': number_of_nodes,
         'to_nc': to_nc,
         'parallel': parallel,
+        'split_nc': split_nc,
         'input_file': input_file,
         'input_dir': input_dir,
         'output_dir': output_dir,
@@ -101,6 +124,7 @@ def cli(
         'comp_method': comp_method,
         'comp_mode': comp_mode,
         'comp_level': comp_level,
+        'chunkable_dimension': chunkable_dimension,
     }
     runner = Runner(**context.obj)
     runner.run()

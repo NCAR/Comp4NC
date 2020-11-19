@@ -39,7 +39,7 @@ def cluster_wait(client, n_workers):
             break
 
 
-def convert_zarr(ds, varname, chunkable_dim, path_zarr, comp):
+def convert_to_zarr(ds, varname, chunkable_dim, path_zarr, comp, split_nc):
 
     if comp['comp_mode'] == 'a':
         m = _zfpy.mode_fixed_accuracy
@@ -55,13 +55,31 @@ def convert_zarr(ds, varname, chunkable_dim, path_zarr, comp):
 
     # zarr.storage.default_compressor = compressor
 
-    """ Check if variable data nbytes are less than 192MB """
-    ds1 = ds.chunk(chunks=chunkable_dim)
-    for _varname in ds.data_vars:
-        if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
-            ds1[_varname].encoding['compressor'] = compressor
+    if not bool(chunkable_dim):
+        """ Check if variable data nbytes are less than 192MB """
+        for _varname in ds.data_vars:
+            if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
+                timestep = calculate_chunks(ds, _varname)
+                varname = _varname
+        ds1 = ds.chunk(chunks={'time': timestep})
+        ds1[varname].encoding['compressor'] = compressor
 
+    else:
+        ds1 = ds.chunk(chunks=chunkable_dim)
+        for _varname in ds.data_vars:
+            if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
+                ds1[_varname].encoding['compressor'] = compressor
     ds1.to_zarr(path_zarr, mode='w', consolidated=True)
+
+
+def calculate_chunks(ds, varname):
+    """ Check if variable data nbytes are less than 192MB """
+    if ds[varname].nbytes < 201326592:
+        timestep = -1
+    else:
+        x = ceil(ds[varname].nbytes / 201326592)
+        timestep = int(ds[varname].sizes['time'] / x)
+    return timestep
 
 
 def write_to_netcdf(path_zarr, path_nc):
@@ -187,6 +205,7 @@ class Runner:
         LENS = False
         parallel = self.params['parallel']
         to_nc = self.params['to_nc']
+        split_nc = self.params['split_nc']
         input_file = self.params['input_file']
         input_dir = self.params['input_dir']
         output_dir = self.params['output_dir']
@@ -210,11 +229,10 @@ class Runner:
             logger.warning('wait')
             # cluster_wait(self.client, num_nodes * num_workers)
 
-        if exists(input_file):
-
-            files = [input_file]
+        if input_file is None:
+            files = glob.glob(input_dir + '/*.nc')
         else:
-            files = glob.glob(input_dir)
+            files = [input_file]
         pre = {}
         for counter, i in enumerate(files):
             if (counter >= num_files['start']) and (counter < num_files['end']):
@@ -236,7 +254,7 @@ class Runner:
                     pre['orig'] = i
                     pre['zarr'] = path_zarr
                     pre['nc'] = path_nc
-                    convert_zarr(ds, varname, chunkable_dim, path_zarr, compression)
+                    convert_to_zarr(ds, varname, chunkable_dim, path_zarr, compression, split_nc)
                     print(i, '... Done')
                     if to_nc:
                         write_to_netcdf(path_zarr, path_nc)

@@ -4,10 +4,11 @@ memory: 109GB
 maxcore_per_node: 36
 number_of_workers_per_nodes: 1
 number_of_nodes: 10
-to_nc: True
+to_nc: False
 parallel: True
-input_file: /glade/work/haiyingx/30kmHistory/history_state.2010-10-23_00.03.00.nc
-input_dir: /glade/p/cisl/asap/ldcpy_sample_data/lens/orig/*.nc
+split_nc: True
+input_file:
+input_dir: /glade/p/cisl/asap/ldcpy_sample_data/lens/orig/
 output_dir: /glade/scratch/haiyingx
 index_of_files:
     start: 0
@@ -17,5 +18,3 @@ compression:
     comp_mode: p
     comp_level: 12
 chunkable_dimension:
-    nCells: 655362
-    nEdges: 655362

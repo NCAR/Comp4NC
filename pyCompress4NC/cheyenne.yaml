@@ -12,9 +12,7 @@ input_dir: /glade/p/cisl/asap/ldcpy_sample_data/lens/orig/
 output_dir: /glade/scratch/haiyingx
 index_of_files:
     start: 0
-    end: 1
-compression:
-    comp_method: zfp
-    comp_mode: p
-    comp_level: 12
+    end: 2
+compress_config:
+    pyCompress4NC/compress_config.yaml
 chunkable_dimension:

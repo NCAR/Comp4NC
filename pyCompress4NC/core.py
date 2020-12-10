@@ -7,11 +7,13 @@ from os import walk
 from os.path import abspath, basename, dirname, exists, getsize, join
 from pathlib import Path
 from time import sleep, time
+from timeit import default_timer as timer
 
 import click
 import dask.array as da
 import numpy as np
 import xarray as xr
+import yaml
 import zarr
 from dask_jobqueue import PBSCluster, SLURMCluster
 from distributed import Client
@@ -39,36 +41,55 @@ def cluster_wait(client, n_workers):
             break
 
 
-def convert_to_zarr(ds, varname, chunkable_dim, path_zarr, comp, split_nc):
+def define_compressor(varname, comp_dict):
+
+    compressor = {}
+    if 'all' in comp_dict:
+        comp = comp_dict['all']
+    else:
+        if varname in comp_dict:
+            comp = comp_dict[varname]
+        else:
+            print("Error, you didn't define compression method for " + varname)
+            exit()
 
     if comp['comp_mode'] == 'a':
         m = _zfpy.mode_fixed_accuracy
-        compressor = ZFPY(mode=m, tolerance=float(comp['comp_level']))
+        compressor[varname] = ZFPY(mode=m, tolerance=float(comp['comp_level']))
     elif comp['comp_mode'] == 'p':
         m = _zfpy.mode_fixed_precision
-        compressor = ZFPY(mode=m, precision=int(comp['comp_level']))
+        compressor[varname] = ZFPY(mode=m, precision=int(comp['comp_level']))
     elif comp['comp_mode'] == 'r':
         m = _zfpy.mode_fixed_rate
-        compressor = ZFPY(mode=m, rate=int(comp['comp_level']))
+        compressor[varname] = ZFPY(mode=m, rate=int(comp['comp_level']))
     else:
         print('Wrong zfp compression mode')
 
-    # zarr.storage.default_compressor = compressor
+    return compressor
+
+
+def convert_to_zarr(ds, varname, chunkable_dim, path_zarr, comp, split_nc):
 
     if not bool(chunkable_dim):
-        """ Check if variable data nbytes are less than 192MB """
+        """ time series file only has one variable to compress """
+        """ and we can use time diemnsion as chunking dimension """
         for _varname in ds.data_vars:
             if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
                 timestep = calculate_chunks(ds, _varname)
                 varname = _varname
+        compressor = define_compressor(varname, comp)
         ds1 = ds.chunk(chunks={'time': timestep})
-        ds1[varname].encoding['compressor'] = compressor
+        ds1[varname].encoding['compressor'] = compressor[varname]
 
     else:
+        """ time history file has many variables to compress """
+        """ and we need users to specify chunking dimensions from config file """
         ds1 = ds.chunk(chunks=chunkable_dim)
         for _varname in ds.data_vars:
             if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
-                ds1[_varname].encoding['compressor'] = compressor
+                compressor = define_compressor(_varname, comp)
+                print(compressor)
+                ds1[_varname].encoding['compressor'] = compressor[_varname]
     ds1.to_zarr(path_zarr, mode='w', consolidated=True)
 
 
@@ -90,13 +111,18 @@ def write_to_netcdf(path_zarr, path_nc):
         var: comp for var in ds.data_vars if len(ds[var].dims) >= 2 and ds[var].dtype == 'float32'
     }
 
+    print(encoding)
     ds.to_netcdf(path_nc, encoding=encoding)
     shutil.rmtree(path_zarr)
 
 
-def output_singlefile_path(filename_dir, var, filename_first, dirout, comp, write=False):
+def output_singlefile_path(filename_dir, var, filename_first, dirout, comp_dict, write=False):
 
-    comp_name = f'{comp["comp_method"]}_{comp["comp_mode"]}_{comp["comp_level"]}'
+    if 'all' in comp_dict:
+        comp = comp_dict['all']
+        comp_name = f'{comp["comp_method"]}_{comp["comp_mode"]}_{comp["comp_level"]}'
+    else:
+        comp_name = 'hybrid'
     path_zarr = f'{dirout}/{comp_name}/{filename_first}.zarr'
     path_nc = f'{dirout}/{comp_name}/{filename_first}.nc'
     if write and exists(path_zarr):
@@ -120,7 +146,7 @@ def parse_singlefile(filename):
     period = res[2]
     filename_first = filename_only[:-3]
     filename_dir = dirname(filename)
-    # print(filename_only, filename_first, filename_dir)
+    print(filename_only, filename_first, filename_dir)
 
     return varname, period, filename_dir, filename_first
 
@@ -160,7 +186,6 @@ class Runner:
     def __init__(self, **context_dict):
 
         if context_dict['config_file']:
-            import yaml
 
             try:
                 with open(context_dict['config_file']) as f:
@@ -170,13 +195,14 @@ class Runner:
         else:
             self.params = context_dict
             compression = {}
+            compression['all'] = {}
+            compression['all']['comp_method'] = context_dict['comp_method']
+            compression['all']['comp_mode'] = context_dict['comp_mode']
+            compression['all']['comp_level'] = context_dict['comp_level']
+            self.params['compression'] = compression
             index_of_files = {}
-            compression['comp_method'] = context_dict['comp_method']
-            compression['comp_mode'] = context_dict['comp_mode']
-            compression['comp_level'] = context_dict['comp_level']
             index_of_files['start'] = context_dict['start']
             index_of_files['end'] = context_dict['end']
-            self.params['compression'] = compression
             self.params['index_of_files'] = index_of_files
         self.client = None
 
@@ -210,8 +236,17 @@ class Runner:
         input_dir = self.params['input_dir']
         output_dir = self.params['output_dir']
         num_files = self.params['index_of_files']
-        compression = self.params['compression']
         chunkable_dim = self.params['chunkable_dimension']
+        print(chunkable_dim)
+        if 'compression' not in self.params:
+            try:
+                with open(self.params['compress_config']) as fc:
+                    compression = yaml.safe_load(fc)
+            except Exception as exc:
+                raise exc
+            print(compression)
+        else:
+            compression = self.params['compression']
 
         # logger.warning(memory)
         # logger.warning(maxcore_per_node)
@@ -224,11 +259,10 @@ class Runner:
             self.create_cluster(queue, maxcore_per_node, memory, num_workers, walltime)
             self.client.cluster.scale(n=num_nodes * num_workers)
             logger.warning('scale')
-            # sleep(10)
             self.client.wait_for_workers(num_nodes * num_workers)
             logger.warning('wait')
-            # cluster_wait(self.client, num_nodes * num_workers)
 
+        start_time = timer()
         if input_file is None:
             files = glob.glob(input_dir + '/*.nc')
         else:
@@ -262,6 +296,8 @@ class Runner:
 
         # logger.warning(ds)
         logger.warning('All done')
+        end_time = timer()
+        print('elapsed time', end_time - start_time)
         if parallel:
             self.client.cluster.close()
             self.client.close()

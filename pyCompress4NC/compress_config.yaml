@@ -1,0 +1,20 @@
+PRECT:
+    comp_method: zfp
+    comp_mode: p
+    comp_level: 16
+PS:
+    comp_method: zfp
+    comp_mode: p
+    comp_level: 20
+TS:
+    comp_method: zfp
+    comp_mode: p
+    comp_level: 24
+TMQ:
+    comp_method: zfp
+    comp_mode: p
+    comp_level: 28
+FLNS:
+    comp_method: zfp
+    comp_mode: a
+    comp_level: 0.01

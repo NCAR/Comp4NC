@@ -107,11 +107,16 @@ def write_to_netcdf(path_zarr, path_nc):
 
     ds = xr.open_zarr(path_zarr)
     comp = dict(zlib=True, complevel=5)
-    encoding = {
-        var: comp for var in ds.data_vars if len(ds[var].dims) >= 2 and ds[var].dtype == 'float32'
-    }
+    encoding = {}
+    for var in ds.data_vars:
+        encoding[var] = {}
+        if len(ds[var].dims) >= 2 and ds[var].dtype == 'float32':
+            print(var, ds[var].encoding['chunks'])
+            encoding[var]['chunksizes'] = list(ds[var].encoding['chunks'])
+            encoding[var].update(comp)
+        else:
+            encoding[var] = comp
 
-    print(encoding)
     ds.to_netcdf(path_nc, encoding=encoding)
     shutil.rmtree(path_zarr)
 

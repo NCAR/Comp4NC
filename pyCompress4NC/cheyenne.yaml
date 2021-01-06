@@ -1,18 +1,19 @@
 queue: regular
-walltime: 1:00:00
+walltime: 1:30:00
 memory: 109GB
 maxcore_per_node: 36
-number_of_workers_per_nodes: 1
-number_of_nodes: 10
-to_nc: False
+number_of_workers_per_nodes: 4
+number_of_nodes: 2
+to_nc: True
 parallel: True
 split_nc: True
 input_file:
-input_dir: /glade/p/cisl/asap/ldcpy_sample_data/lens/orig/
+input_dir: /glade/p/cisl/asap/abaker/compression_samples/pop-lens/orig/
 output_dir: /glade/scratch/haiyingx
 index_of_files:
     start: 0
-    end: 2
+    end: 1
 compress_config:
-    pyCompress4NC/compress_config.yaml
+    pyCompress4NC/compress_config_same.yaml
 chunkable_dimension:
+       time: 6

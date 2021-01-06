@@ -18,6 +18,9 @@ import zarr
 from dask_jobqueue import PBSCluster, SLURMCluster
 from distributed import Client
 from numcodecs.zfpy import ZFPY, _zfpy
+from numcodecs.zlib import Zlib
+
+from .process_missingval import assert_orig_recon, get_missingval_mask, open_zarrfile
 
 logger = logging.getLogger()
 logger.setLevel(level=logging.WARNING)
@@ -41,6 +44,26 @@ def cluster_wait(client, n_workers):
             break
 
 
+def zfp_compressor(varname, comp):
+    if comp['comp_mode'] == 'a':
+        m = _zfpy.mode_fixed_accuracy
+        compressor = ZFPY(mode=m, tolerance=float(comp['comp_level']))
+    elif comp['comp_mode'] == 'p':
+        m = _zfpy.mode_fixed_precision
+        compressor = ZFPY(mode=m, precision=int(comp['comp_level']))
+    elif comp['comp_mode'] == 'r':
+        m = _zfpy.mode_fixed_rate
+        compressor = ZFPY(mode=m, rate=int(comp['comp_level']))
+    else:
+        print('Wrong zfp compression mode')
+    return compressor
+
+
+def zlib_compressor(varname, comp):
+    compressor = Zlib(level=comp['comp_level'])
+    return compressor
+
+
 def define_compressor(varname, comp_dict):
 
     compressor = {}
@@ -53,31 +76,28 @@ def define_compressor(varname, comp_dict):
             print("Error, you didn't define compression method for " + varname)
             exit()
 
-    if comp['comp_mode'] == 'a':
-        m = _zfpy.mode_fixed_accuracy
-        compressor[varname] = ZFPY(mode=m, tolerance=float(comp['comp_level']))
-    elif comp['comp_mode'] == 'p':
-        m = _zfpy.mode_fixed_precision
-        compressor[varname] = ZFPY(mode=m, precision=int(comp['comp_level']))
-    elif comp['comp_mode'] == 'r':
-        m = _zfpy.mode_fixed_rate
-        compressor[varname] = ZFPY(mode=m, rate=int(comp['comp_level']))
+    if comp['comp_method'] == 'zfp':
+        compressor[varname] = zfp_compressor(varname, comp)
     else:
-        print('Wrong zfp compression mode')
+        compressor[varname] = zlib_compressor(varname, comp)
 
     return compressor
 
 
-def convert_to_zarr(ds, varname, chunkable_dim, path_zarr, comp, split_nc):
+def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, split_nc):
 
-    if not bool(chunkable_dim):
+    if 'time' in chunkable_dim:
         """ time series file only has one variable to compress """
         """ and we can use time diemnsion as chunking dimension """
         for _varname in ds.data_vars:
             if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
                 timestep = calculate_chunks(ds, _varname)
                 varname = _varname
+        zarr.storage.default_compressor = Zlib(level=5)
         compressor = define_compressor(varname, comp)
+        if POP:
+            ds1 = get_missingval_mask(ds)
+            ds = ds1
         ds1 = ds.chunk(chunks={'time': timestep})
         ds1[varname].encoding['compressor'] = compressor[varname]
 
@@ -103,9 +123,12 @@ def calculate_chunks(ds, varname):
     return timestep
 
 
-def write_to_netcdf(path_zarr, path_nc):
+def write_to_netcdf(path_zarr, path_nc, POP):
 
-    ds = xr.open_zarr(path_zarr)
+    if POP:
+        ds = open_zarrfile(path_zarr)
+    else:
+        ds = xr.open_zarr(path_zarr)
     comp = dict(zlib=True, complevel=5)
     encoding = {}
     for var in ds.data_vars:
@@ -114,10 +137,13 @@ def write_to_netcdf(path_zarr, path_nc):
             print(var, ds[var].encoding['chunks'])
             encoding[var]['chunksizes'] = list(ds[var].encoding['chunks'])
             encoding[var].update(comp)
+            ds[var].encoding['chunksizes'] = list(ds[var].encoding['chunks'])
+            ds[var].encoding.update(comp)
+            ds[var].to_netcdf(path_nc[:-2] + var + '.nc')
         else:
             encoding[var] = comp
 
-    ds.to_netcdf(path_nc, encoding=encoding)
+    # ds.to_netcdf(path_nc, encoding=encoding)
     shutil.rmtree(path_zarr)
 
 
@@ -145,6 +171,10 @@ def output_path(cmpn, frequency, var, filename_first, dirout, comp, write=False)
 
 
 def parse_singlefile(filename):
+    if 'pop' in filename:
+        POP = True
+    else:
+        POP = False
     filename_only = basename(filename)
     res = re.split(r'\.', filename_only)
     varname = res[0]
@@ -153,10 +183,14 @@ def parse_singlefile(filename):
     filename_dir = dirname(filename)
     print(filename_only, filename_first, filename_dir)
 
-    return varname, period, filename_dir, filename_first
+    return POP, varname, period, filename_dir, filename_first
 
 
 def parse_filename(filename):
+    if 'pop' in filename:
+        POP = True
+    else:
+        POP = False
 
     res = re.split(r'\/', filename)
     cmpn = res[6] + '/' + res[7]
@@ -167,7 +201,7 @@ def parse_filename(filename):
     varname = res[7]
     period = res[8]
 
-    return varname, period, cmpn, frequency, filename_first
+    return POP, varname, period, cmpn, frequency, filename_first
 
 
 def get_filesize(file_dict, period, to_nc):
@@ -242,7 +276,7 @@ class Runner:
         output_dir = self.params['output_dir']
         num_files = self.params['index_of_files']
         chunkable_dim = self.params['chunkable_dimension']
-        print(chunkable_dim)
+        print('chunk', chunkable_dim)
         if 'compression' not in self.params:
             try:
                 with open(self.params['compress_config']) as fc:
@@ -276,11 +310,11 @@ class Runner:
         for counter, i in enumerate(files):
             if (counter >= num_files['start']) and (counter < num_files['end']):
                 if LENS:
-                    varname, period, cmpn, frequency, filename_first = parse_filename(i)
+                    POP, varname, period, cmpn, frequency, filename_first = parse_filename(i)
                 else:
-                    varname, period, filename_dir, filename_first = parse_singlefile(i)
+                    POP, varname, period, filename_dir, filename_first = parse_singlefile(i)
 
-                with xr.open_dataset(i) as ds:
+                with xr.open_dataset(i, chunks=chunkable_dim) as ds:
                     if LENS:
                         path_zarr, path_nc = output_path(
                             cmpn, frequency, varname, filename_first, output_dir, compression
@@ -293,10 +327,13 @@ class Runner:
                     pre['orig'] = i
                     pre['zarr'] = path_zarr
                     pre['nc'] = path_nc
-                    convert_to_zarr(ds, varname, chunkable_dim, path_zarr, compression, split_nc)
+                    convert_to_zarr(
+                        POP, ds, varname, chunkable_dim, path_zarr, compression, split_nc
+                    )
+                    assert_orig_recon(i, path_zarr, chunkable_dim, POP)
                     print(i, '... Done')
                     if to_nc:
-                        write_to_netcdf(path_zarr, path_nc)
+                        write_to_netcdf(path_zarr, path_nc, POP)
                     get_filesize(pre, period, to_nc)
 
         # logger.warning(ds)

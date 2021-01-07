@@ -84,7 +84,7 @@ def define_compressor(varname, comp_dict):
     return compressor
 
 
-def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, split_nc):
+def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp):
 
     if 'time' in chunkable_dim:
         """ time series file only has one variable to compress """
@@ -123,7 +123,7 @@ def calculate_chunks(ds, varname):
     return timestep
 
 
-def write_to_netcdf(path_zarr, path_nc, POP):
+def write_to_netcdf(path_zarr, path_nc, POP, split_nc):
 
     if POP:
         ds = open_zarrfile(path_zarr)
@@ -135,15 +135,18 @@ def write_to_netcdf(path_zarr, path_nc, POP):
         encoding[var] = {}
         if len(ds[var].dims) >= 2 and ds[var].dtype == 'float32':
             print(var, ds[var].encoding['chunks'])
-            encoding[var]['chunksizes'] = list(ds[var].encoding['chunks'])
-            encoding[var].update(comp)
-            ds[var].encoding['chunksizes'] = list(ds[var].encoding['chunks'])
-            ds[var].encoding.update(comp)
-            ds[var].to_netcdf(path_nc[:-2] + var + '.nc')
+            if split_nc:
+                ds[var].encoding['chunksizes'] = list(ds[var].encoding['chunks'])
+                ds[var].encoding.update(comp)
+                ds[var].to_netcdf(path_nc[:-2] + var + '.nc')
+            else:
+                encoding[var]['chunksizes'] = list(ds[var].encoding['chunks'])
+                encoding[var].update(comp)
         else:
             encoding[var] = comp
 
-    # ds.to_netcdf(path_nc, encoding=encoding)
+    if not split_nc:
+        ds.to_netcdf(path_nc, encoding=encoding)
     shutil.rmtree(path_zarr)
 
 
@@ -327,13 +330,11 @@ class Runner:
                     pre['orig'] = i
                     pre['zarr'] = path_zarr
                     pre['nc'] = path_nc
-                    convert_to_zarr(
-                        POP, ds, varname, chunkable_dim, path_zarr, compression, split_nc
-                    )
+                    convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, compression)
                     assert_orig_recon(i, path_zarr, chunkable_dim, POP)
                     print(i, '... Done')
                     if to_nc:
-                        write_to_netcdf(path_zarr, path_nc, POP)
+                        write_to_netcdf(path_zarr, path_nc, POP, split_nc)
                     get_filesize(pre, period, to_nc)
 
         # logger.warning(ds)

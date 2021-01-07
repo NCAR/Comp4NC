@@ -27,10 +27,10 @@ def get_missingval_mask(ds):
 
 def apply_missingval(ds, varname3d, varname4d):
     for i in varname3d:
-        dv = ds[i].where(not ds['missing_mask_3d'])
+        dv = ds[i].where(ds['missing_mask_3d'] == 0)
         ds[i].data = dv.data
     for i in varname4d:
-        dv = ds[i].where(not ds['missing_mask_4d'])
+        dv = ds[i].where(ds['missing_mask_4d'] == 0)
         ds[i].data = dv.data
     return ds
 

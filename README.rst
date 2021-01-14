@@ -76,6 +76,7 @@ Command line options::
       --number_of_nodes INTEGER       Number of nodes required  [default: 1]
       --to_nc                         Writing to netcdf format  [default: False]
       --parallel                      Running in parallel mode  [default: False]
+
       --input_file PATH               Input file name
       --input_dir PATH                Input directory name
       --output_dir PATH               Output directory name  [default: .]
@@ -95,13 +96,19 @@ Command line options::
       --comp_level FLOAT              Specify which compression level will be
                                       used.  [default: 0.1]
 
+      --chunkable_dimension TEXT      Specify the chunk dimension for some
+                                      variables.  [default: {}]
+
+      --chunkable_chunksize INTEGER   Specify the chunk size for
+                                      chunkable_dimension.  [default: 10]
+
       --help                          Show this message and exit.
 
 To run the codes from command lines with compression zfp in p mode, keeping 16 bits and outputing to netcdf format parallelly::
 
     ./pyCompress --input_file /glade/p/cisl/asap/ldcpy_sample_data/lens/orig/
     TS.daily.20060101-20801231.nc --comp_method zfp --comp_mode p
-    --comp_level 16 --parallel --to_nc
+    --comp_level 16 --parallel --to_nc --chunkable_dimension time
 
 Re-create notebooks with Pangeo Binder
 --------------------------------------

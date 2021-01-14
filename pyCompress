@@ -79,7 +79,13 @@ from pyCompress4NC.core import Runner
 @click.option(
     '--chunkable_dimension',
     default={},
-    help='Specify the chunk size for some dimension.',
+    help='Specify the chunk dimension for some variables.',
+    show_default=True,
+)
+@click.option(
+    '--chunkable_chunksize',
+    default=10,
+    help='Specify the chunk size for chunkable_dimension.',
     show_default=True,
 )
 @click.pass_context
@@ -104,6 +110,7 @@ def cli(
     comp_mode,
     comp_level,
     chunkable_dimension,
+    chunkable_chunksize,
 ):
     context.obj = {
         'config_file': config_file,
@@ -125,6 +132,7 @@ def cli(
         'comp_mode': comp_mode,
         'comp_level': comp_level,
         'chunkable_dimension': chunkable_dimension,
+        'chunkable_chunksize': chunkable_chunksize,
     }
     runner = Runner(**context.obj)
     runner.run()

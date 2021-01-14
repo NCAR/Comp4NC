@@ -108,7 +108,6 @@ def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp):
         for _varname in ds.data_vars:
             if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
                 compressor = define_compressor(_varname, comp)
-                print(compressor)
                 ds1[_varname].encoding['compressor'] = compressor[_varname]
     ds1.to_zarr(path_zarr, mode='w', consolidated=True)
 
@@ -134,7 +133,7 @@ def write_to_netcdf(path_zarr, path_nc, POP, split_nc):
     for var in ds.data_vars:
         encoding[var] = {}
         if len(ds[var].dims) >= 2 and ds[var].dtype == 'float32':
-            print(var, ds[var].encoding['chunks'])
+            # print(var, ds[var].encoding['chunks'])
             if split_nc:
                 ds[var].encoding['chunksizes'] = list(ds[var].encoding['chunks'])
                 ds[var].encoding.update(comp)
@@ -184,7 +183,6 @@ def parse_singlefile(filename):
     period = res[2]
     filename_first = filename_only[:-3]
     filename_dir = dirname(filename)
-    print(filename_only, filename_first, filename_dir)
 
     return POP, varname, period, filename_dir, filename_first
 
@@ -246,6 +244,10 @@ class Runner:
             index_of_files['start'] = context_dict['start']
             index_of_files['end'] = context_dict['end']
             self.params['index_of_files'] = index_of_files
+            if context_dict['chunkable_dimension']:
+                chunkable = {}
+                chunkable[context_dict['chunkable_dimension']] = context_dict['chunkable_chunksize']
+                self.params['chunkable_dimension'] = chunkable
         self.client = None
 
     def create_cluster(self, queue, maxcore, memory, wpn, walltime):
@@ -279,7 +281,6 @@ class Runner:
         output_dir = self.params['output_dir']
         num_files = self.params['index_of_files']
         chunkable_dim = self.params['chunkable_dimension']
-        print('chunk', chunkable_dim)
         if 'compression' not in self.params:
             try:
                 with open(self.params['compress_config']) as fc:

@@ -23,8 +23,9 @@
         :alt: Conda Version
 
 
-pyCompress4NC
+Comp4NC
 =============
+Python tool to compress data with zfp to Zarr and convert to NetCDF
 
 Production
 ------------

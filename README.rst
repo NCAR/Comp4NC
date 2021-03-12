@@ -110,6 +110,9 @@ To run the codes from command lines with compression zfp in p mode, keeping 16 b
     ./pyCompress --input_file /glade/p/cisl/asap/ldcpy_sample_data/lens/orig/
     TS.daily.20060101-20801231.nc --comp_method zfp --comp_mode p
     --comp_level 16 --parallel --to_nc --chunkable_dimension time
+    --chunkable_chunksize 6
+
+ZFP or zlib compression can compress each variable with at most 4 dimensions in one batch, if you specify chunkable_dimension and chunkable_chunksize, the compressors will compress on each chunk.
 
 Re-create notebooks with Pangeo Binder
 --------------------------------------

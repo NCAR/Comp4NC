@@ -66,6 +66,7 @@ def zfp_compressor(varname, comp):
 
 
 def zlib_compressor(varname, comp):
+
     compressor = Zlib(level=comp['comp_level'])
     return compressor
 
@@ -348,25 +349,53 @@ class Runner:
         for counter, i in enumerate(files):
             if (counter >= num_files['start']) and (counter < num_files['end']):
                 if LENS:
-                    (POP, varname, period, cmpn, frequency, filename_first,) = parse_filename(i)
+                    (
+                        POP,
+                        varname,
+                        period,
+                        cmpn,
+                        frequency,
+                        filename_first,
+                    ) = parse_filename(i)
                 else:
-                    (POP, varname, period, filename_dir, filename_first,) = parse_singlefile(i)
+                    (
+                        POP,
+                        varname,
+                        period,
+                        filename_dir,
+                        filename_first,
+                    ) = parse_singlefile(i)
 
                 with xr.open_dataset(i, chunks=chunkable_dim) as ds:
                     if LENS:
                         path_zarr, path_nc = output_path(
-                            cmpn, frequency, varname, filename_first, output_dir, compression,
+                            cmpn,
+                            frequency,
+                            varname,
+                            filename_first,
+                            output_dir,
+                            compression,
                         )
                     else:
                         path_zarr, path_nc = output_singlefile_path(
-                            filename_dir, varname, filename_first, output_dir, compression,
+                            filename_dir,
+                            varname,
+                            filename_first,
+                            output_dir,
+                            compression,
                         )
                     pre['var'] = varname
                     pre['orig'] = i
                     pre['zarr'] = path_zarr
                     pre['nc'] = path_nc
                     convert_to_zarr(
-                        POP, ds, varname, chunkable_dim, path_zarr, compression, self.client,
+                        POP,
+                        ds,
+                        varname,
+                        chunkable_dim,
+                        path_zarr,
+                        compression,
+                        self.client,
                     )
                     assert_orig_recon(i, path_zarr, chunkable_dim, POP)
                     print(i, '... Done')

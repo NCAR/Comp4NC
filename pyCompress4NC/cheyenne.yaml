@@ -1,13 +1,13 @@
-queue: regular
+queue: casper
 walltime: 1:30:00
 memory: 109GB
 maxcore_per_node: 36
-number_of_workers_per_nodes: 4
-number_of_nodes: 2
-to_nc: True
+number_of_workers_per_nodes: 10
+number_of_nodes: 1
+to_nc: False
 parallel: True
 split_nc: False
-input_file:
+input_file: /glade/scratch/haiyingx/cam-pop/ABSORB.orig.200601-208012.nc
 input_dir: /glade/p/cisl/asap/abaker/compression_samples/pop-lens/orig/
 output_dir: /glade/scratch/haiyingx
 index_of_files:
@@ -16,4 +16,4 @@ index_of_files:
 compress_config:
     pyCompress4NC/compress_config_same.yaml
 chunkable_dimension:
-       time: 6
+       time: 1

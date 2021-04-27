@@ -17,10 +17,16 @@ import yaml
 import zarr
 from dask_jobqueue import PBSCluster, SLURMCluster
 from distributed import Client
+from numcodecs.quantize import Quantize
 from numcodecs.zfpy import ZFPY, _zfpy
 from numcodecs.zlib import Zlib
 
-from .process_missingval import assert_orig_recon, get_missingval_mask, open_zarrfile
+from .process_missingval import (
+    assert_orig_recon,
+    get_missingval_mask,
+    open_zarrfile,
+    reorder_mpas_data,
+)
 
 logger = logging.getLogger()
 logger.setLevel(level=logging.WARNING)
@@ -64,6 +70,11 @@ def zlib_compressor(varname, comp):
     return compressor
 
 
+def quantize_compressor(varname, comp):
+    compressor = Quantize(digits=comp['comp_level'], dtype='f4', astype='f2')
+    return compressor
+
+
 def define_compressor(varname, comp_dict):
 
     compressor = {}
@@ -84,7 +95,7 @@ def define_compressor(varname, comp_dict):
     return compressor
 
 
-def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp):
+def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, client):
 
     if 'time' in chunkable_dim:
         """ time series file only has one variable to compress """
@@ -95,11 +106,12 @@ def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp):
                 varname = _varname
         zarr.storage.default_compressor = Zlib(level=5)
         compressor = define_compressor(varname, comp)
-        if POP:
-            ds1 = get_missingval_mask(ds)
-            ds = ds1
+        # if POP:
+        ds1 = get_missingval_mask(ds, POP)
+        ds = ds1
         ds1 = ds.chunk(chunks={'time': timestep})
         ds1[varname].encoding['compressor'] = compressor[varname]
+        ds1.to_zarr(path_zarr, mode='w', consolidated=True)
 
     else:
         """ time history file has many variables to compress """
@@ -109,7 +121,11 @@ def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp):
             if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
                 compressor = define_compressor(_varname, comp)
                 ds1[_varname].encoding['compressor'] = compressor[_varname]
-    ds1.to_zarr(path_zarr, mode='w', consolidated=True)
+                # ds1[_varname].encoding['compressor'] = None
+                # a = ds1[_varname].data.map_blocks(zarr.array, compressor=compressor[_varname]).persist().map_blocks(np.array)
+                # ds1[_varname].data = a
+                # reorder_mpas_data(ds, _varname, client, compressor, path_zarr)
+        ds1.to_zarr(path_zarr, mode='w', consolidated=True)
 
 
 def calculate_chunks(ds, varname):
@@ -158,8 +174,24 @@ def output_singlefile_path(filename_dir, var, filename_first, dirout, comp_dict,
         comp_name = 'hybrid'
     path_zarr = f'{dirout}/{comp_name}/{filename_first}.zarr'
     path_nc = f'{dirout}/{comp_name}/{filename_first}.nc'
-    if write and exists(path_zarr):
-        shutil.rmtree(path_zarr)
+    s3 = False
+    if s3:
+        import fsspec
+
+        fs = fsspec.filesystem(
+            's3',
+            profile='default',
+            anon=False,
+            client_kwargs={'endpoint_url": "https://stratus.ucar.edu'},
+            skip_instance_cache=True,
+            use_listings_cache=True,
+        )
+        root = 'comp4nc-files'
+        path_zarr = fs.get_mapper(
+            root=f'{root}/{comp_name}/{filename_first}.zarr', check=False, create=True
+        )
+    # if write and exists(path_zarr):
+    #    shutil.rmtree(path_zarr)
     return path_zarr, path_nc
 
 
@@ -173,11 +205,11 @@ def output_path(cmpn, frequency, var, filename_first, dirout, comp, write=False)
 
 
 def parse_singlefile(filename):
-    if 'pop' in filename:
+    filename_only = basename(filename)
+    if 'pop' in filename_only:
         POP = True
     else:
         POP = False
-    filename_only = basename(filename)
     res = re.split(r'\.', filename_only)
     varname = res[0]
     period = res[2]
@@ -258,9 +290,9 @@ class Runner:
             processes=wpn,
             local_directory='$TMPDIR',
             walltime=walltime,
-            # resource_spec='select=1:ncpus=36:mem=109GB',
+            extra=['--nthreads', '1', '--lifetime', '55m', '--lifetime-stagger', '4m'],
+            # resource_spec='select=1:ncpus=12:ompthreads=12:mem=109GB',
         )
-        # resource_spec='select=1:ncpus=36:mem=109GB')
         logger.warning(cluster.job_script())
         self.client = Client(cluster)
 
@@ -269,6 +301,7 @@ class Runner:
         queue = self.params['queue']
         walltime = self.params['walltime']
         memory = self.params['memory']
+        logger.warning(memory)
         maxcore_per_node = self.params['maxcore_per_node']
         num_workers = self.params['number_of_workers_per_nodes']
         num_nodes = self.params['number_of_nodes']
@@ -293,16 +326,17 @@ class Runner:
 
         # logger.warning(memory)
         # logger.warning(maxcore_per_node)
-        # logger.warning(num_nodes)
-        # logger.warning(num_workers)
+        logger.warning(num_nodes)
+        logger.warning(num_workers)
         # logger.warning(input_dir)
         # logger.warning(output_dir)
         # logger.warning(walltime)
         if parallel:
             self.create_cluster(queue, maxcore_per_node, memory, num_workers, walltime)
             self.client.cluster.scale(n=num_nodes * num_workers)
+            # self.client.cluster.adapt(maximum=num_nodes*num_workers)
             logger.warning('scale')
-            self.client.wait_for_workers(num_nodes * num_workers)
+            # self.client.wait_for_workers(n_workers=num_nodes*num_workers )
             logger.warning('wait')
 
         start_time = timer()
@@ -314,29 +348,31 @@ class Runner:
         for counter, i in enumerate(files):
             if (counter >= num_files['start']) and (counter < num_files['end']):
                 if LENS:
-                    POP, varname, period, cmpn, frequency, filename_first = parse_filename(i)
+                    (POP, varname, period, cmpn, frequency, filename_first,) = parse_filename(i)
                 else:
-                    POP, varname, period, filename_dir, filename_first = parse_singlefile(i)
+                    (POP, varname, period, filename_dir, filename_first,) = parse_singlefile(i)
 
                 with xr.open_dataset(i, chunks=chunkable_dim) as ds:
                     if LENS:
                         path_zarr, path_nc = output_path(
-                            cmpn, frequency, varname, filename_first, output_dir, compression
+                            cmpn, frequency, varname, filename_first, output_dir, compression,
                         )
                     else:
                         path_zarr, path_nc = output_singlefile_path(
-                            filename_dir, varname, filename_first, output_dir, compression
+                            filename_dir, varname, filename_first, output_dir, compression,
                         )
                     pre['var'] = varname
                     pre['orig'] = i
                     pre['zarr'] = path_zarr
                     pre['nc'] = path_nc
-                    convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, compression)
+                    convert_to_zarr(
+                        POP, ds, varname, chunkable_dim, path_zarr, compression, self.client,
+                    )
                     assert_orig_recon(i, path_zarr, chunkable_dim, POP)
                     print(i, '... Done')
                     if to_nc:
                         write_to_netcdf(path_zarr, path_nc, POP, split_nc)
-                    get_filesize(pre, period, to_nc)
+                    # get_filesize(pre, period, to_nc)
 
         # logger.warning(ds)
         logger.warning('All done')

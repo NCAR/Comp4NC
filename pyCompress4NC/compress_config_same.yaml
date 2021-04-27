@@ -1,4 +1,4 @@
 all:
     comp_method: zfp
-    comp_mode: p
-    comp_level: 18
+    comp_mode: a
+    comp_level: 0.000001

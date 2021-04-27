@@ -1,4 +1,4 @@
-name: pyCompress4NC
+name: pyCompress4_numcodecs
 channels:
   - conda-forge
 dependencies:
@@ -18,4 +18,4 @@ dependencies:
   - zarr
   - zfpy
   - pip:
-       - git+https://github.com/halehawk/numcodecs.git@zfpy
+       - git+https://github.com/zarr-developers/numcodecs.git

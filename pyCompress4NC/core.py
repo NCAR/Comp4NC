@@ -36,7 +36,7 @@ results_dir = join(here, 'results')
 
 
 def cluster_wait(client, n_workers):
-    """ Delay process until all workers in the cluster are available. """
+    """Delay process until all workers in the cluster are available."""
     start = time()
     wait_thresh = 600
     worker_thresh = n_workers * 0.95
@@ -98,7 +98,7 @@ def define_compressor(varname, comp_dict):
 def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, client):
 
     if 'time' in chunkable_dim:
-        """ time series file only has one variable to compress """
+        """time series file only has one variable to compress"""
         """ and we can use time diemnsion as chunking dimension """
         for _varname in ds.data_vars:
             if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
@@ -114,7 +114,7 @@ def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, client):
         ds1.to_zarr(path_zarr, mode='w', consolidated=True)
 
     else:
-        """ time history file has many variables to compress """
+        """time history file has many variables to compress"""
         """ and we need users to specify chunking dimensions from config file """
         ds1 = ds.chunk(chunks=chunkable_dim)
         for _varname in ds.data_vars:
@@ -129,7 +129,7 @@ def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, client):
 
 
 def calculate_chunks(ds, varname):
-    """ Check if variable data nbytes are less than 192MB """
+    """Check if variable data nbytes are less than 192MB"""
     if ds[varname].nbytes < 201326592:
         timestep = -1
     else:
@@ -243,7 +243,7 @@ def get_filesize(file_dict, period, to_nc):
         origsize = getsize(file_dict['orig'])
         filesize = 0
         if k == 'zarr' and not to_nc:
-            """ Parse zarr info to get compressed file size """
+            """Parse zarr info to get compressed file size"""
             filesize = sum(p.stat().st_size for p in Path(v).rglob('*'))
 
             print(f'{basename(file_dict["orig"])} input size {origsize}')

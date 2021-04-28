@@ -9,27 +9,28 @@ import xarray as xr
 import zarr
 
 
-def get_missingval_mask(ds, pop):
+def get_missingval_mask(ds, pop, na):
     print('get_missingval_mask')
+    null_arr = None
     for var in ds.data_vars:
         print(var, ds[var].dims)
 
         if len(ds[var].dims) >= 3 and ds[var].dtype == 'float32' and ds[var].dims[0] == 'time':
-            print('var=', var)
             if pop:
                 print(ds[var].data.shape)
                 null_arr = ds[var][0].isnull()
             else:
                 null_arr = ds[var].isnull()
-                t1 = null_arr[2].groupby(null_arr[2]).count().values
-                t2 = null_arr[1].groupby(null_arr[1]).count().values
-                print(t1, t2)
-            d = ds[var].fillna(0)
+                if not null_arr.any():
+                    continue
+            print('after continue')
+            if na['api'] == 'interp':
+                d = ds[var].interpolate_na(na['dim'], method=na['method'])
+            elif na['api'] == 'fillna':
+                d = ds[var].fillna(na['fill_value'])
             ds[var].data = d.data
             var_name = f'missing_mask_{var}'
             ds[var_name] = null_arr
-        # ds1 = ds.assign(f'{var_name}=null_arr_3d)
-        # ds = ds1
     return ds
 
 
@@ -46,19 +47,35 @@ def open_zarrfile(filename):
     ds = xr.open_zarr(filename)
     for var in ds.data_vars:
         if len(ds[var].dims) >= 3 and ds[var].dtype == 'float32':
-            var_dict.append(var)
-    ds1 = apply_missingval(ds, var_dict)
+            if f'missing_mask_{var}' in ds.data_vars:
+                var_dict.append(var)
+    if bool(var_dict):
+        ds1 = apply_missingval(ds, var_dict)
+    else:
+        print('no')
+        ds1 = ds
     return ds1
 
 
-def assert_orig_recon(file_orig, file_recon, chunkable_dim, POP):
-    if POP:
+def assert_orig_recon(file_orig, file_recon, chunkable_dim, na):
+    if bool(na):
         ds_recon = open_zarrfile(file_recon)
     else:
         ds_recon = xr.open_zarr(file_recon)
+    # var_dict = []
+    # miss_arr = 'missing_mask_'
+    # for var in ds.data_vars:
+    #    if miss_arr in var:
+    #        varname = var[len(miss_arr):]
+    #        var_dict.append(varname)
+    # if bool(var_dict):
+    #    ds_recon = apply_missingval(ds, var_dict)
+    # else:
+    #    print('assert')
+    #    ds_recon = ds
     ds_orig = xr.open_dataset(file_orig, chunks=chunkable_dim)
     for var in ds_orig.data_vars:
-        if len(ds_orig[var].dims) >= 2 and ds_orig[var].dtype == 'float32':
+        if len(ds_orig[var].dims) >= 3 and ds_orig[var].dtype == 'float32':
             d_orig = ds_orig[var]
             d_recon = ds_recon[var]
             orig_mean = d_orig.mean().persist()

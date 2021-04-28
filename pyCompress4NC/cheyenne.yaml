@@ -17,3 +17,8 @@ compress_config:
     pyCompress4NC/compress_config_same.yaml
 chunkable_dimension:
        time: 1
+fill_nan_value:
+       api: interp
+       method: linear
+       dim: lat
+       fill_value: extrapolate

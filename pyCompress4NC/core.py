@@ -96,7 +96,7 @@ def define_compressor(varname, comp_dict):
     return compressor
 
 
-def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, client):
+def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, na, client):
 
     if 'time' in chunkable_dim:
         """time series file only has one variable to compress"""
@@ -107,9 +107,9 @@ def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, client):
                 varname = _varname
         zarr.storage.default_compressor = Zlib(level=5)
         compressor = define_compressor(varname, comp)
-        # if POP:
-        ds1 = get_missingval_mask(ds, POP)
-        ds = ds1
+        if bool(na):
+            ds1 = get_missingval_mask(ds, POP, na)
+            ds = ds1
         ds1 = ds.chunk(chunks={'time': timestep})
         ds1[varname].encoding['compressor'] = compressor[varname]
         ds1.to_zarr(path_zarr, mode='w', consolidated=True)
@@ -314,6 +314,9 @@ class Runner:
         input_dir = self.params['input_dir']
         output_dir = self.params['output_dir']
         num_files = self.params['index_of_files']
+        fill_nan_value = {}
+        if 'fill_nan_value' in self.params:
+            fill_nan_value = self.params['fill_nan_value']
         chunkable_dim = self.params['chunkable_dimension']
         if 'compression' not in self.params:
             try:
@@ -395,9 +398,10 @@ class Runner:
                         chunkable_dim,
                         path_zarr,
                         compression,
+                        fill_nan_value,
                         self.client,
                     )
-                    assert_orig_recon(i, path_zarr, chunkable_dim, POP)
+                    assert_orig_recon(i, path_zarr, chunkable_dim, fill_nan_value)
                     print(i, '... Done')
                     if to_nc:
                         write_to_netcdf(path_zarr, path_nc, POP, split_nc)

@@ -337,10 +337,10 @@ class Runner:
         # logger.warning(walltime)
         if parallel:
             self.create_cluster(queue, maxcore_per_node, memory, num_workers, walltime)
+            logger.warning('scale')
             self.client.cluster.scale(n=num_nodes * num_workers)
             # self.client.cluster.adapt(maximum=num_nodes*num_workers)
-            logger.warning('scale')
-            # self.client.wait_for_workers(n_workers=num_nodes*num_workers )
+            self.client.wait_for_workers(n_workers=num_nodes * num_workers)
             logger.warning('wait')
 
         start_time = timer()
@@ -401,7 +401,7 @@ class Runner:
                         fill_nan_value,
                         self.client,
                     )
-                    assert_orig_recon(i, path_zarr, chunkable_dim, fill_nan_value)
+                    # assert_orig_recon(i, path_zarr, chunkable_dim, fill_nan_value)
                     print(i, '... Done')
                     if to_nc:
                         write_to_netcdf(path_zarr, path_nc, POP, split_nc)

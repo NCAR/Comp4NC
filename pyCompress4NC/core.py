@@ -291,7 +291,7 @@ class Runner:
             processes=wpn,
             local_directory='$TMPDIR',
             walltime=walltime,
-            extra=['--nthreads', '1', '--lifetime', '55m', '--lifetime-stagger', '4m'],
+            # extra=['--nthreads', '1', '--lifetime', '55m', '--lifetime-stagger', '4m'],
             # resource_spec='select=1:ncpus=12:ompthreads=12:mem=109GB',
         )
         logger.warning(cluster.job_script())
@@ -330,16 +330,15 @@ class Runner:
 
         # logger.warning(memory)
         # logger.warning(maxcore_per_node)
-        logger.warning(num_nodes)
-        logger.warning(num_workers)
+        # logger.warning(num_nodes)
+        # logger.warning(num_workers)
         # logger.warning(input_dir)
         # logger.warning(output_dir)
         # logger.warning(walltime)
         if parallel:
             self.create_cluster(queue, maxcore_per_node, memory, num_workers, walltime)
-            logger.warning('scale')
             self.client.cluster.scale(n=num_nodes * num_workers)
-            # self.client.cluster.adapt(maximum=num_nodes*num_workers)
+            logger.warning('scale')
             self.client.wait_for_workers(n_workers=num_nodes * num_workers)
             logger.warning('wait')
 

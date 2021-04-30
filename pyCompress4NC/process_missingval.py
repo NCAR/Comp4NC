@@ -62,40 +62,30 @@ def assert_orig_recon(file_orig, file_recon, chunkable_dim, na):
         ds_recon = open_zarrfile(file_recon)
     else:
         ds_recon = xr.open_zarr(file_recon)
-    # var_dict = []
-    # miss_arr = 'missing_mask_'
-    # for var in ds.data_vars:
-    #    if miss_arr in var:
-    #        varname = var[len(miss_arr):]
-    #        var_dict.append(varname)
-    # if bool(var_dict):
-    #    ds_recon = apply_missingval(ds, var_dict)
-    # else:
-    #    print('assert')
-    #    ds_recon = ds
-    ds_orig = xr.open_dataset(file_orig, chunks=chunkable_dim)
-    for var in ds_orig.data_vars:
-        if len(ds_orig[var].dims) >= 3 and ds_orig[var].dtype == 'float32':
-            d_orig = ds_orig[var]
+    # ds_orig = xr.open_dataset(file_orig, chunks=chunkable_dim)
+    recon_mean = {}
+    for var in ds_recon.data_vars:
+        if len(ds_recon[var].dims) >= 3 and ds_recon[var].dtype == 'float32':
+            # d_orig = ds_orig[var]
             d_recon = ds_recon[var]
-            orig_mean = d_orig.mean().persist()
-            orig_max = d_orig.max().persist()
-            orig_min = d_orig.min().persist()
-            recon_mean = d_recon.mean().persist()
-            recon_max = d_recon.max().persist()
-            recon_min = d_recon.min().persist()
+            # orig_mean = d_orig.mean().persist()
+            # orig_max = d_orig.max().persist()
+            # orig_min = d_orig.min().persist()
+            recon_mean[var] = d_recon.mean().persist()
+            # recon_max = d_recon.max().persist()
+            # recon_min = d_recon.min().persist()
             # validate = da.allclose(d_recon, d_orig, rtol=0.0, atol=0.01, equal_nan=True)
-            print(
-                var,
-                'orig mean: ',
-                orig_mean.values,
-                orig_max.values,
-                orig_min.values,
-                ' recon mean: ',
-                recon_mean.values,
-                recon_max.values,
-                recon_min.values,
-            )
+    print(
+        # var,
+        # 'orig mean: ',
+        # orig_mean.values,
+        # orig_max.values,
+        # orig_min.values,
+        ' recon mean: ',
+        da.compute(recon_mean),
+        # recon_max.values,
+        # recon_min.values,
+    )
 
 
 # def assert_average_orig_recon(ds_var, output_csv):

@@ -30,6 +30,7 @@ from .process_missingval import (
 
 logger = logging.getLogger()
 logger.setLevel(level=logging.WARNING)
+nthreads = 2
 
 here = dirname(abspath(dirname(__file__)))
 results_dir = join(here, 'results')
@@ -121,8 +122,8 @@ def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, na, client
         for _varname in ds.data_vars:
             if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
                 compressor = define_compressor(_varname, comp)
-                ds1[_varname].encoding['compressor'] = compressor[_varname]
-                # ds1[_varname].encoding['compressor'] = None
+                # ds1[_varname].encoding['compressor'] = compressor[_varname]
+                ds1[_varname].encoding['compressor'] = None
                 # a = ds1[_varname].data.map_blocks(zarr.array, compressor=compressor[_varname]).persist().map_blocks(np.array)
                 # ds1[_varname].data = a
                 # reorder_mpas_data(ds, _varname, client, compressor, path_zarr)
@@ -291,7 +292,14 @@ class Runner:
             processes=wpn,
             local_directory='$TMPDIR',
             walltime=walltime,
-            # extra=['--nthreads', '1', '--lifetime', '55m', '--lifetime-stagger', '4m'],
+            interface='ib0',
+            extra=[
+                '--nthreads',
+                f'{nthreads}',
+                '--no-dashboard',
+                '--death-timeout',
+                '120',
+            ]  # '--lifetime', '55m', '--lifetime-stagger', '4m'],
             # resource_spec='select=1:ncpus=12:ompthreads=12:mem=109GB',
         )
         logger.warning(cluster.job_script())
@@ -310,6 +318,7 @@ class Runner:
         parallel = self.params['parallel']
         to_nc = self.params['to_nc']
         split_nc = self.params['split_nc']
+        convert = self.params['convert']
         input_file = self.params['input_file']
         input_dir = self.params['input_dir']
         output_dir = self.params['output_dir']
@@ -390,17 +399,18 @@ class Runner:
                     pre['orig'] = i
                     pre['zarr'] = path_zarr
                     pre['nc'] = path_nc
-                    convert_to_zarr(
-                        POP,
-                        ds,
-                        varname,
-                        chunkable_dim,
-                        path_zarr,
-                        compression,
-                        fill_nan_value,
-                        self.client,
-                    )
-                    # assert_orig_recon(i, path_zarr, chunkable_dim, fill_nan_value)
+                    if convert:
+                        convert_to_zarr(
+                            POP,
+                            ds,
+                            varname,
+                            chunkable_dim,
+                            path_zarr,
+                            compression,
+                            fill_nan_value,
+                            self.client,
+                        )
+                    assert_orig_recon(i, path_zarr, chunkable_dim, fill_nan_value)
                     print(i, '... Done')
                     if to_nc:
                         write_to_netcdf(path_zarr, path_nc, POP, split_nc)
@@ -409,7 +419,11 @@ class Runner:
         # logger.warning(ds)
         logger.warning('All done')
         end_time = timer()
-        print('elapsed time', end_time - start_time)
+        import csv
+
+        with open('no_compress.csv', 'a') as fd:
+            writer = csv.writer(fd)
+            writer.writerow([num_nodes, num_workers, nthreads, 'read', end_time - start_time])
         if parallel:
             self.client.cluster.close()
             self.client.close()

@@ -141,10 +141,10 @@ def calculate_chunks(ds, varname):
 
 def write_to_netcdf(path_zarr, path_nc, POP, split_nc):
 
-    if POP:
-        ds = open_zarrfile(path_zarr)
-    else:
-        ds = xr.open_zarr(path_zarr)
+    # if POP:
+    ds = open_zarrfile(path_zarr)
+    # else:
+    #    ds = xr.open_zarr(path_zarr)
     comp = dict(zlib=True, complevel=5)
     encoding = {}
     for var in ds.data_vars:

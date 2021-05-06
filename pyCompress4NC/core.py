@@ -30,7 +30,7 @@ from .process_missingval import (
 
 logger = logging.getLogger()
 logger.setLevel(level=logging.WARNING)
-nthreads = 2
+nthreads = 3
 
 here = dirname(abspath(dirname(__file__)))
 results_dir = join(here, 'results')
@@ -122,8 +122,8 @@ def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, na, client
         for _varname in ds.data_vars:
             if len(ds[_varname].dims) >= 2 and ds[_varname].dtype == 'float32':
                 compressor = define_compressor(_varname, comp)
-                # ds1[_varname].encoding['compressor'] = compressor[_varname]
-                ds1[_varname].encoding['compressor'] = None
+                ds1[_varname].encoding['compressor'] = compressor[_varname]
+                # ds1[_varname].encoding['compressor'] = None
                 # a = ds1[_varname].data.map_blocks(zarr.array, compressor=compressor[_varname]).persist().map_blocks(np.array)
                 # ds1[_varname].data = a
                 # reorder_mpas_data(ds, _varname, client, compressor, path_zarr)
@@ -142,10 +142,10 @@ def calculate_chunks(ds, varname):
 
 def write_to_netcdf(path_zarr, path_nc, POP, split_nc):
 
-    if POP:
-        ds = open_zarrfile(path_zarr)
-    else:
-        ds = xr.open_zarr(path_zarr)
+    # if POP:
+    ds = open_zarrfile(path_zarr)
+    # else:
+    #    ds = xr.open_zarr(path_zarr)
     comp = dict(zlib=True, complevel=5)
     encoding = {}
     for var in ds.data_vars:
@@ -194,6 +194,7 @@ def output_singlefile_path(filename_dir, var, filename_first, dirout, comp_dict,
         )
     # if write and exists(path_zarr):
     #    shutil.rmtree(path_zarr)
+    # print(path_zarr)
     return path_zarr, path_nc
 
 
@@ -282,6 +283,15 @@ class Runner:
                 chunkable = {}
                 chunkable[context_dict['chunkable_dimension']] = context_dict['chunkable_chunksize']
                 self.params['chunkable_dimension'] = chunkable
+            if context_dict['fill_api']:
+                fill_nan_value = {}
+                fill_nan_value['api'] = context_dict['fill_api']
+                fill_nan_value['fill_value'] = context_dict['fill_value']
+                if context_dict['fill_method']:
+                    fill_nan_value['method'] = context_dict['fill_method']
+                    fill_nan_value['dim'] = context_dict['dim']
+                self.params['fill_nan_value'] = fill_nan_value
+
         self.client = None
 
     def create_cluster(self, queue, maxcore, memory, wpn, walltime):
@@ -293,13 +303,13 @@ class Runner:
             local_directory='$TMPDIR',
             walltime=walltime,
             interface='ib0',
-            extra=[
-                '--nthreads',
-                f'{nthreads}',
-                '--no-dashboard',
-                '--death-timeout',
-                '120',
-            ]  # '--lifetime', '55m', '--lifetime-stagger', '4m'],
+            # extra=[
+            #    '--nthreads',
+            #    f'{nthreads}',
+            #    '--no-dashboard',
+            #    '--death-timeout',
+            #    '600',
+            # ]  # '--lifetime', '55m', '--lifetime-stagger', '4m'],
             # resource_spec='select=1:ncpus=12:ompthreads=12:mem=109GB',
         )
         logger.warning(cluster.job_script())
@@ -410,7 +420,8 @@ class Runner:
                             fill_nan_value,
                             self.client,
                         )
-                    assert_orig_recon(i, path_zarr, chunkable_dim, fill_nan_value)
+                    else:
+                        assert_orig_recon(i, path_zarr, chunkable_dim, fill_nan_value)
                     print(i, '... Done')
                     if to_nc:
                         write_to_netcdf(path_zarr, path_nc, POP, split_nc)
@@ -419,11 +430,14 @@ class Runner:
         # logger.warning(ds)
         logger.warning('All done')
         end_time = timer()
+        print('elapsed time', end_time - start_time)
+        '''
         import csv
 
-        with open('no_compress.csv', 'a') as fd:
+        with open('compress_read.csv', 'a') as fd:
             writer = csv.writer(fd)
-            writer.writerow([num_nodes, num_workers, nthreads, 'read', end_time - start_time])
+            writer.writerow([num_nodes, num_workers, nthreads, 'write', end_time - start_time])
+        '''
         if parallel:
             self.client.cluster.close()
             self.client.close()

@@ -1,4 +1,4 @@
-name: pyCompress4_numcodecs
+name: pyCompress4
 channels:
   - conda-forge
 dependencies:

@@ -88,6 +88,36 @@ from pyCompress4NC.core import Runner
     help='Specify the chunk size for chunkable_dimension.',
     show_default=True,
 )
+@click.option(
+    '--fill_api',
+    default='',
+    help='Specify the fill value API to use.',
+    show_default=True,
+)
+@click.option(
+    '--fill_value',
+    default=0,
+    help='Specify the fill value to use in the fill value API.',
+    show_default=True,
+)
+@click.option(
+    '--fill_method',
+    default='',
+    help='Specify the method to use in the fill value API, for example linear.',
+    show_default=True,
+)
+@click.option(
+    '--fill_dim',
+    default='',
+    help='Specify the dimension use in the fill value API, for example lon',
+    show_default=True,
+)
+@click.option(
+    '--convert',
+    default=True,
+    help='Specify compression operation or decompression operation, compression is True',
+    show_default=True,
+)
 @click.pass_context
 def cli(
     context,
@@ -111,6 +141,11 @@ def cli(
     comp_level,
     chunkable_dimension,
     chunkable_chunksize,
+    fill_api,
+    fill_value,
+    fill_method,
+    fill_dim,
+    convert,
 ):
     context.obj = {
         'config_file': config_file,
@@ -133,6 +168,11 @@ def cli(
         'comp_level': comp_level,
         'chunkable_dimension': chunkable_dimension,
         'chunkable_chunksize': chunkable_chunksize,
+        'fill_api': fill_api,
+        'fill_value': fill_value,
+        'fill_method': fill_method,
+        'fill_dim': fill_dim,
+        'convert': convert,
     }
     runner = Runner(**context.obj)
     runner.run()

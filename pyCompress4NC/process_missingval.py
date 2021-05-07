@@ -13,17 +13,17 @@ def get_missingval_mask(ds, pop, na):
     print('get_missingval_mask')
     null_arr = None
     for var in ds.data_vars:
-        print(var, ds[var].dims)
+        # print(var, ds[var].dims)
 
         if len(ds[var].dims) >= 3 and ds[var].dtype == 'float32' and ds[var].dims[0] == 'time':
             if pop:
-                print(ds[var].data.shape)
+                # print(ds[var].data.shape)
                 null_arr = ds[var][0].isnull()
             else:
                 null_arr = ds[var].isnull()
                 if not null_arr.any():
                     continue
-            print('after continue')
+            # print('after continue')
             if na['api'] == 'interp':
                 d = ds[var].interpolate_na(na['dim'], method=na['method'])
             elif na['api'] == 'fillna':
@@ -35,6 +35,7 @@ def get_missingval_mask(ds, pop, na):
 
 
 def apply_missingval(ds, varname_dict):
+    # print('apply_missingval')
     for i in varname_dict:
         dv = ds[i].where(ds[f'missing_mask_{i}'] == 0)
         ds[i].data = dv.data
@@ -52,7 +53,7 @@ def open_zarrfile(filename):
     if bool(var_dict):
         ds1 = apply_missingval(ds, var_dict)
     else:
-        print('no')
+        # print('no')
         ds1 = ds
     return ds1
 

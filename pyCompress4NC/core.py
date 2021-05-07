@@ -324,7 +324,7 @@ class Runner:
                     compression = yaml.safe_load(fc)
             except Exception as exc:
                 raise exc
-            print(compression)
+            # print(compression)
         else:
             compression = self.params['compression']
 
@@ -400,7 +400,7 @@ class Runner:
                         fill_nan_value,
                         self.client,
                     )
-                    # assert_orig_recon(i, path_zarr, chunkable_dim, fill_nan_value)
+                    assert_orig_recon(i, path_zarr, chunkable_dim, fill_nan_value)
                     print(i, '... Done')
                     if to_nc:
                         write_to_netcdf(path_zarr, path_nc, POP, split_nc)

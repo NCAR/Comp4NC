@@ -25,7 +25,7 @@ def get_missingval_mask(ds, pop, na):
                     continue
             # print('after continue')
             if na['api'] == 'interp':
-                d = ds[var].interpolate_na(na['dim'], method=na['method'])
+                d = ds[var].interpolate_na(na['dim'], method=na['method'], fill_value=0)
             elif na['api'] == 'fillna':
                 d = ds[var].fillna(na['fill_value'])
             ds[var].data = d.data
@@ -35,7 +35,7 @@ def get_missingval_mask(ds, pop, na):
 
 
 def apply_missingval(ds, varname_dict):
-    # print('apply_missingval')
+    print('apply_missingval')
     for i in varname_dict:
         dv = ds[i].where(ds[f'missing_mask_{i}'] == 0)
         ds[i].data = dv.data

@@ -30,6 +30,11 @@ def get_missingval_mask(ds, pop, na):
                 )
             elif na['api'] == 'fillna':
                 d = ds[var].fillna(na['fill_value'])
+            elif na['api'] == 'ffill':
+                d = ds[var].ffill(na['dim'])
+            elif na['api'] == 'bfill':
+                d = ds[var].bfill(na['dim'])
+            d = ds[var].fillna(0)
             ds[var].data = d.data
             var_name = f'missing_mask_{var}'
             ds[var_name] = null_arr

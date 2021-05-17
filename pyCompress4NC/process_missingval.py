@@ -9,6 +9,14 @@ import xarray as xr
 import zarr
 
 
+class DevNullStore:
+    def __init__(self):
+        pass
+
+    def __setitem__(*args, **kwargs):
+        pass
+
+
 def get_missingval_mask(ds, pop, na):
     print('get_missingval_mask')
     null_arr = None
@@ -63,6 +71,18 @@ def open_zarrfile(filename):
         # print('no')
         ds1 = ds
     return ds1
+
+
+def readfile(file_recon, na):
+    if bool(na):
+        ds_recon = open_zarrfile(file_recon)
+    else:
+        ds_recon = xr.open_zarr(file_recon)
+    null_store = DevNullStore()
+    null_store['foo'] = 'bar'
+    # future = da.store(ds[:,999:,999:], null_store, lock=False, compute=False)
+    future = da.store(ds_recon, null_store, lock=False, compute=False)
+    future.compute()
 
 
 def assert_orig_recon(file_orig, file_recon, chunkable_dim, na):

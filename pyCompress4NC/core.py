@@ -214,6 +214,7 @@ def parse_singlefile(filename):
     res = re.split(r'\.', filename_only)
     varname = res[0]
     period = res[2]
+    print(period)
     filename_first = filename_only[:-3]
     filename_dir = dirname(filename)
 

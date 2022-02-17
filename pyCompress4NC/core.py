@@ -110,7 +110,10 @@ def convert_to_zarr(POP, ds, varname, chunkable_dim, path_zarr, comp, na, client
         if bool(na):
             ds1 = get_missingval_mask(ds, POP, na)
             ds = ds1
-        ds1 = ds.chunk(chunks={'time': timestep})
+        if True:
+            ds1 = ds.chunk(chunks={'time': chunkable_dim})
+        else:
+            ds1 = ds.chunk(chunks={'time': timestep})
         ds1[varname].encoding['compressor'] = compressor[varname]
         ds1.to_zarr(path_zarr, mode='w', consolidated=True)
 
